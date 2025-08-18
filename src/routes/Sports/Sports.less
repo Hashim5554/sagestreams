@@ -1,0 +1,147 @@
+@import (reference) '../../custom-theme.less';
+
+.sports-container {
+    height: 100%;
+}
+
+.sports-content {
+    height: 100%;
+    overflow: auto;
+    padding: 1rem 1.25rem 2rem;
+}
+
+.message {
+    margin: 2rem auto;
+    text-align: center;
+    opacity: 0.85;
+}
+
+.section {
+    margin: 1rem 0 2rem;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    margin: 0 0 0.75rem;
+    opacity: 0.9;
+}
+
+.category {
+    margin-bottom: 1.25rem;
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.category-title {
+    font-size: 1.05rem;
+    opacity: 0.85;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    background: fade(@color-surface, 85%);
+    border: 1px solid fade(@color-primary, 15%);
+    border-radius: 12px;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px fade(@color-primary, 10%);
+}
+
+.poster {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: fade(@color-primary, 8%);
+}
+
+.poster-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.poster-fallback {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, fade(@color-primary, 10%), fade(@color-primary, 4%));
+}
+
+.badge-live,
+.badge-upcoming {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+}
+
+.badge-live {
+    color: #fff;
+    background: linear-gradient(180deg, #ff3b30, #c81d1d);
+}
+
+.badge-upcoming {
+    color: #fff;
+    background: linear-gradient(180deg, #f59e0b, #b45309);
+}
+
+.card-body {
+    padding: 10px 10px 12px;
+}
+
+.card-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.card-subtitle {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.time {
+    margin-top: 6px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    opacity: 0.75;
+}
+
+.watch-button {
+    width: 100%;
+}
+
+.modal {
+    width: min(94vw, 1100px);
+}
+
+.iframe-container {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    background: #000;
+}
+
+.iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+

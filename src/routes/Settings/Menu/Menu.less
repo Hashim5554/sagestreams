@@ -1,0 +1,73 @@
+@import (reference) '../../../custom-theme.less';
+@import (reference) '~stremio/common/screen-sizes.less';
+
+.menu {
+    flex: none;
+    align-self: stretch;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem 0 1rem;
+    background: transparent;
+    border: none;
+    overflow: visible;
+
+    .button {
+        position: relative;
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 2.1rem;
+        padding: 0 0.8rem;
+        border-radius: 1rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--primary-foreground-color);
+        opacity: 0.78;
+        background: linear-gradient(135deg, fade(@color-surface, 32%) 0%, fade(@color-surface-dark1, 14%) 100%);
+        border: 1px solid fade(@color-primary, 20%);
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+        transition: transform 140ms ease, opacity 140ms ease, box-shadow 180ms ease, background 180ms ease;
+
+        &:hover {
+            opacity: 1;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+
+        &.selected {
+            opacity: 1;
+            background: linear-gradient(135deg, fade(@color-accent1, 24%) 0%, fade(@color-primary, 18%) 100%);
+            box-shadow: 0 12px 26px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);
+            transform: translateY(-1px);
+        }
+
+        &:active { transform: translateY(0); box-shadow: 0 6px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06); }
+
+        &::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 35%;
+            border-radius: inherit;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(255,255,255,0));
+            opacity: 0; transition: opacity 180ms ease;
+        }
+        &:hover::after { opacity: 1; }
+    }
+
+    .spacing { display: none; }
+
+    .version-info-label { display: none; }
+}
+
+@media only screen and (max-width: @xsmall) {
+    .menu { position: sticky; }
+}
+
+@media only screen and (max-width: @minimum) {
+    .menu { position: sticky; }
+}

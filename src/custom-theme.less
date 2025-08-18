@@ -1,0 +1,240 @@
+// Custom Sage Green Theme for Stremio
+// Overriding the default color palette with a beautiful sage green theme
+
+// Sage Green Palette
+@color-sage: #B2BFA5;        // Soft, muted green with gray undertones
+@color-eucalyptus: #A8C3A0;  // Slightly lighter, with a fresh and calming presence
+@color-mist-green: #CCDBCE;  // A pale, delicate green, reminiscent of morning mist
+@color-willow-grey: #9DA99A; // A more muted, earthy green, with subtle grayish tint
+@color-celadon: #D3DEC5;     // Gentle pastel green, with a soothing appearance
+
+// Convert hex to HSL for consistency with Stremio's color system
+// Sage: #B2BFA5 -> hsl(100, 20%, 70%)
+// Eucalyptus: #A8C3A0 -> hsl(110, 25%, 68%)
+// Mist Green: #CCDBCE -> hsl(120, 15%, 82%)
+// Willow Grey: #9DA99A -> hsl(90, 15%, 60%)
+// Celadon: #D3DEC5 -> hsl(105, 18%, 80%)
+
+// Primary color (main accent) - using Eucalyptus as the primary
+@color-primary: hsl(110, 25%, 68%);
+@color-primary-10: hsla(110, 25%, 68%, 0.1);
+@color-primary-20: hsla(110, 25%, 68%, 0.2);
+@color-primary-30: hsla(110, 25%, 68%, 0.3);
+@color-primary-40: hsla(110, 25%, 68%, 0.4);
+@color-primary-50: hsla(110, 25%, 68%, 0.5);
+@color-primary-60: hsla(110, 25%, 68%, 0.6);
+@color-primary-70: hsla(110, 25%, 68%, 0.7);
+@color-primary-80: hsla(110, 25%, 68%, 0.8);
+@color-primary-90: hsla(110, 25%, 68%, 0.9);
+
+// Primary light variants
+@color-primary-light1: hsl(110, 25%, 73%);
+@color-primary-light2: hsl(110, 25%, 78%);
+@color-primary-light3: hsl(110, 25%, 83%);
+@color-primary-light4: hsl(110, 25%, 88%);
+@color-primary-light5: hsl(110, 25%, 93%);
+
+// Primary dark variants
+@color-primary-dark1: hsl(110, 25%, 63%);
+@color-primary-dark2: hsl(110, 25%, 58%);
+@color-primary-dark3: hsl(110, 25%, 53%);
+@color-primary-dark4: hsl(110, 25%, 48%);
+@color-primary-dark5: hsl(110, 25%, 43%);
+
+// Secondary color - using Sage
+@color-secondary: hsl(100, 20%, 70%);
+@color-secondary-10: hsla(100, 20%, 70%, 0.1);
+@color-secondary-20: hsla(100, 20%, 70%, 0.2);
+@color-secondary-30: hsla(100, 20%, 70%, 0.3);
+@color-secondary-40: hsla(100, 20%, 70%, 0.4);
+@color-secondary-50: hsla(100, 20%, 70%, 0.5);
+@color-secondary-60: hsla(100, 20%, 70%, 0.6);
+@color-secondary-70: hsla(100, 20%, 70%, 0.7);
+@color-secondary-80: hsla(100, 20%, 70%, 0.8);
+@color-secondary-90: hsla(100, 20%, 70%, 0.9);
+
+// Background colors - using darker sage variants
+@color-background: hsl(100, 15%, 25%);      // Dark sage background
+@color-background-light1: hsl(100, 15%, 30%);
+@color-background-light2: hsl(100, 15%, 35%);
+@color-background-light3: hsl(100, 15%, 40%);
+@color-background-light4: hsl(100, 15%, 45%);
+@color-background-light5: hsl(100, 15%, 50%);
+@color-background-dark1: hsl(100, 15%, 20%);
+@color-background-dark2: hsl(100, 15%, 15%);
+@color-background-dark3: hsl(100, 15%, 10%);
+@color-background-dark4: hsl(100, 15%, 5%);
+@color-background-dark5: hsl(100, 15%, 2%);
+
+// Surface colors - using Mist Green and Celadon
+@color-surface: hsl(120, 15%, 82%);         // Mist Green
+@color-surface-10: hsla(120, 15%, 82%, 0.1);
+@color-surface-20: hsla(120, 15%, 82%, 0.2);
+@color-surface-30: hsla(120, 15%, 82%, 0.3);
+@color-surface-40: hsla(120, 15%, 82%, 0.4);
+@color-surface-50: hsla(120, 15%, 82%, 0.5);
+@color-surface-60: hsla(120, 15%, 82%, 0.6);
+@color-surface-70: hsla(120, 15%, 82%, 0.7);
+@color-surface-80: hsla(120, 15%, 82%, 0.8);
+@color-surface-90: hsla(120, 15%, 82%, 0.9);
+
+// Surface light variants
+@color-surface-light1: hsl(120, 15%, 87%);
+@color-surface-light2: hsl(120, 15%, 92%);
+@color-surface-light3: hsl(120, 15%, 95%);
+@color-surface-light4: hsl(120, 15%, 97%);
+@color-surface-light5: hsl(120, 15%, 99%);
+
+// Surface dark variants
+@color-surface-dark1: hsl(120, 15%, 77%);
+@color-surface-dark2: hsl(120, 15%, 72%);
+@color-surface-dark3: hsl(120, 15%, 67%);
+@color-surface-dark4: hsl(120, 15%, 62%);
+@color-surface-dark5: hsl(120, 15%, 57%);
+
+// Accent colors - using variations of the sage palette
+@color-accent1: hsl(110, 30%, 65%);   // Eucalyptus variant
+@color-accent2: hsl(100, 25%, 60%);   // Sage variant
+@color-accent3: hsl(105, 20%, 75%);   // Celadon variant
+@color-accent4: hsl(90, 18%, 65%);    // Willow Grey variant
+@color-accent5: hsl(115, 22%, 70%);   // Mist Green variant
+
+// Accent color variants with opacity
+@color-accent1-10: hsla(110, 30%, 65%, 0.1);
+@color-accent1-20: hsla(110, 30%, 65%, 0.2);
+@color-accent1-30: hsla(110, 30%, 65%, 0.3);
+@color-accent1-40: hsla(110, 30%, 65%, 0.4);
+@color-accent1-50: hsla(110, 30%, 65%, 0.5);
+@color-accent1-60: hsla(110, 30%, 65%, 0.6);
+@color-accent1-70: hsla(110, 30%, 65%, 0.7);
+@color-accent1-80: hsla(110, 30%, 65%, 0.8);
+@color-accent1-90: hsla(110, 30%, 65%, 0.9);
+
+@color-accent2-10: hsla(100, 25%, 60%, 0.1);
+@color-accent2-20: hsla(100, 25%, 60%, 0.2);
+@color-accent2-30: hsla(100, 25%, 60%, 0.3);
+@color-accent2-40: hsla(100, 25%, 60%, 0.4);
+@color-accent2-50: hsla(100, 25%, 60%, 0.5);
+@color-accent2-60: hsla(100, 25%, 60%, 0.6);
+@color-accent2-70: hsla(100, 25%, 60%, 0.7);
+@color-accent2-80: hsla(100, 25%, 60%, 0.8);
+@color-accent2-90: hsla(100, 25%, 60%, 0.9);
+
+@color-accent3-10: hsla(105, 20%, 75%, 0.1);
+@color-accent3-20: hsla(105, 20%, 75%, 0.2);
+@color-accent3-30: hsla(105, 20%, 75%, 0.3);
+@color-accent3-40: hsla(105, 20%, 75%, 0.4);
+@color-accent3-50: hsla(105, 20%, 75%, 0.5);
+@color-accent3-60: hsla(105, 20%, 75%, 0.6);
+@color-accent3-70: hsla(105, 20%, 75%, 0.7);
+@color-accent3-80: hsla(105, 20%, 75%, 0.8);
+@color-accent3-90: hsla(105, 20%, 75%, 0.9);
+
+@color-accent4-10: hsla(90, 18%, 65%, 0.1);
+@color-accent4-20: hsla(90, 18%, 65%, 0.2);
+@color-accent4-30: hsla(90, 18%, 65%, 0.3);
+@color-accent4-40: hsla(90, 18%, 65%, 0.4);
+@color-accent4-50: hsla(90, 18%, 65%, 0.5);
+@color-accent4-60: hsla(90, 18%, 65%, 0.6);
+@color-accent4-70: hsla(90, 18%, 65%, 0.7);
+@color-accent4-80: hsla(90, 18%, 65%, 0.8);
+@color-accent4-90: hsla(90, 18%, 65%, 0.9);
+
+@color-accent5-10: hsla(115, 22%, 70%, 0.1);
+@color-accent5-20: hsla(115, 22%, 70%, 0.2);
+@color-accent5-30: hsla(115, 22%, 70%, 0.3);
+@color-accent5-40: hsla(115, 22%, 70%, 0.4);
+@color-accent5-50: hsla(115, 22%, 70%, 0.5);
+@color-accent5-60: hsla(115, 22%, 70%, 0.6);
+@color-accent5-70: hsla(115, 22%, 70%, 0.7);
+@color-accent5-80: hsla(115, 22%, 70%, 0.8);
+@color-accent5-90: hsla(115, 22%, 70%, 0.9);
+@color-accent5: hsla(115, 22%, 70%, 1);
+
+@color-accent5-dark1: hsl(115, 22%, 60%);
+@color-accent5-dark2: hsl(115, 22%, 55%);
+@color-accent5-dark3: hsl(115, 22%, 50%);
+@color-accent5-dark4: hsl(115, 22%, 45%);
+@color-accent5-dark5: hsl(115, 22%, 40%);
+
+@color-accent5-light1: hsl(115, 22%, 75%);
+@color-accent5-light2: hsl(115, 22%, 80%);
+@color-accent5-light3: hsl(115, 22%, 85%);
+@color-accent5-light4: hsl(115, 22%, 90%);
+@color-accent5-light5: hsl(115, 22%, 95%);
+
+// Additional variants for light and dark versions
+@color-accent1-light1: hsl(110, 30%, 70%);
+@color-accent1-light2: hsl(110, 30%, 75%);
+@color-accent1-light3: hsl(110, 30%, 80%);
+@color-accent1-light4: hsl(110, 30%, 85%);
+@color-accent1-light5: hsl(110, 30%, 90%);
+
+@color-accent1-dark1: hsl(110, 30%, 60%);
+@color-accent1-dark2: hsl(110, 30%, 55%);
+@color-accent1-dark3: hsl(110, 30%, 50%);
+@color-accent1-dark4: hsl(110, 30%, 45%);
+@color-accent1-dark5: hsl(110, 30%, 40%);
+
+// Background variants with opacity
+@color-background-10: hsla(100, 15%, 25%, 0.1);
+@color-background-20: hsla(100, 15%, 25%, 0.2);
+@color-background-30: hsla(100, 15%, 25%, 0.3);
+@color-background-40: hsla(100, 15%, 25%, 0.4);
+@color-background-50: hsla(100, 15%, 25%, 0.5);
+@color-background-60: hsla(100, 15%, 25%, 0.6);
+@color-background-70: hsla(100, 15%, 25%, 0.7);
+@color-background-80: hsla(100, 15%, 25%, 0.8);
+@color-background-90: hsla(100, 15%, 25%, 0.9);
+
+@color-background-dark5-10: hsla(100, 15%, 2%, 0.1);
+@color-background-dark5-20: hsla(100, 15%, 2%, 0.2);
+@color-background-dark5-30: hsla(100, 15%, 2%, 0.3);
+@color-background-dark5-40: hsla(100, 15%, 2%, 0.4);
+@color-background-dark5-50: hsla(100, 15%, 2%, 0.5);
+@color-background-dark5-60: hsla(100, 15%, 2%, 0.6);
+@color-background-dark5-70: hsla(100, 15%, 2%, 0.7);
+@color-background-dark5-80: hsla(100, 15%, 2%, 0.8);
+@color-background-dark5-90: hsla(100, 15%, 2%, 0.9);
+@color-background-dark5: hsla(100, 15%, 2%, 1);
+
+// Surface variants with opacity
+@color-surface-light5-10: hsla(120, 15%, 99%, 0.1);
+@color-surface-light5-20: hsla(120, 15%, 99%, 0.2);
+@color-surface-light5-30: hsla(120, 15%, 99%, 0.3);
+@color-surface-light5-40: hsla(120, 15%, 99%, 0.4);
+@color-surface-light5-50: hsla(120, 15%, 99%, 0.5);
+@color-surface-light5-60: hsla(120, 15%, 99%, 0.6);
+@color-surface-light5-70: hsla(120, 15%, 99%, 0.7);
+@color-surface-light5-80: hsla(120, 15%, 99%, 0.8);
+@color-surface-light5-90: hsla(120, 15%, 99%, 0.9);
+@color-surface-light5: hsla(120, 15%, 99%, 1);
+
+@color-surface-dark5-10: hsla(120, 15%, 57%, 0.1);
+@color-surface-dark5-20: hsla(120, 15%, 57%, 0.2);
+@color-surface-dark5-30: hsla(120, 15%, 57%, 0.3);
+@color-surface-dark5-40: hsla(120, 15%, 57%, 0.4);
+@color-surface-dark5-50: hsla(120, 15%, 57%, 0.5);
+@color-surface-dark5-60: hsla(120, 15%, 57%, 0.6);
+@color-surface-dark5-70: hsla(120, 15%, 57%, 0.7);
+@color-surface-dark5-80: hsla(120, 15%, 57%, 0.8);
+@color-surface-dark5-90: hsla(120, 15%, 57%, 0.9);
+@color-surface-dark5: hsla(120, 15%, 57%, 1);
+
+// Secondary variant colors
+@color-secondaryvariant1: hsl(105, 25%, 65%);
+@color-secondaryvariant2: hsl(100, 20%, 75%);
+
+@color-secondaryvariant1-light1: hsl(105, 25%, 70%);
+@color-secondaryvariant1-light2: hsl(105, 25%, 75%);
+@color-secondaryvariant1-light3: hsl(105, 25%, 80%);
+@color-secondaryvariant1-light4: hsl(105, 25%, 85%);
+@color-secondaryvariant1-light5: hsl(105, 25%, 90%);
+
+@color-secondaryvariant2-light1: hsl(100, 20%, 80%);
+@color-secondaryvariant2-light2: hsl(100, 20%, 85%);
+@color-secondaryvariant2-light3: hsl(100, 20%, 90%);
+@color-secondaryvariant2-light4: hsl(100, 20%, 95%);
+@color-secondaryvariant2-light5: hsl(100, 20%, 98%);
+
+@color-secondaryvariant2-light1-90: hsla(100, 20%, 80%, 0.9);
