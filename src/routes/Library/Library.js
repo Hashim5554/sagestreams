@@ -71,7 +71,7 @@ const Library = ({ model, urlParams, queryParams }) => {
         }
     }, [typeSelect.value, library.selected]);
     return (
-        <MainNavBars className={styles['library-container']} route={model} title={'SageStreams'}>
+        <MainNavBars className={styles['library-container']} route={model} title={'sagestreams'}>
             {
                 profile.auth !== null ?
                     <div className={styles['library-content']}>
@@ -127,7 +127,7 @@ Library.propTypes = {
 };
 
 const LibraryFallback = ({ model }) => (
-    <MainNavBars className={styles['library-container']} route={model} title={'SageStreams'} />
+    <MainNavBars className={styles['library-container']} route={model} title={'sagestreams'} />
 );
 
 LibraryFallback.propTypes = Library.propTypes;

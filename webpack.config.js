@@ -259,8 +259,8 @@ module.exports = (env, argv) => ({
             imagesPath: 'images',
         }),
         new WebpackPwaManifest({
-            name: 'SageStreams',
-            short_name: 'SageStreams',
+            name: 'sagestreams',
+            short_name: 'sagestreams',
             description: 'Sage Green Streaming Platform',
             background_color: '#404040',
             theme_color: '#A8C3A0',

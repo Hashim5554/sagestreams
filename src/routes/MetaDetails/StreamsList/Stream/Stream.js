@@ -5,7 +5,7 @@ const PropTypes = require('prop-types');
 const classnames = require('classnames');
 const { default: Icon } = require('@stremio/stremio-icons/react');
 const { t } = require('i18next');
-const { useProfile, usePlatform, useToast, useBinaryState } = require('stremio/common');
+const { useProfile, usePlatform, useToast, useBinaryState, useStreamingServer } = require('stremio/common');
 const { Button, Image, Popup } = require('stremio/components');
 const { useServices } = require('stremio/services');
 const { useRouteFocused } = require('stremio-router');
@@ -18,6 +18,7 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
     const platform = usePlatform();
     const { core } = useServices();
     const routeFocused = useRouteFocused();
+    const streamingServer = useStreamingServer();
 
     const [menuOpen, , closeMenu, toggleMenu] = useBinaryState(false);
 
@@ -53,23 +54,23 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
     }, []);
 
     const href = React.useMemo(() => {
-        return deepLinks ?
-            deepLinks.externalPlayer ?
-                deepLinks.externalPlayer.web ?
-                    deepLinks.externalPlayer.web
-                    :
-                    deepLinks.externalPlayer.openPlayer ?
-                        deepLinks.externalPlayer.openPlayer[platform.name] ?
-                            deepLinks.externalPlayer.openPlayer[platform.name]
-                            :
-                            deepLinks.externalPlayer.playlist
-                        :
-                        deepLinks.player
-                :
-                deepLinks.player
-            :
-            null;
-    }, [deepLinks]);
+        if (!deepLinks) return null;
+        const serverReady = Boolean(streamingServer?.baseUrl);
+        // If streaming server is not available (e.g., static hosting like Cloudflare Pages), prefer web link
+        if (!serverReady && deepLinks.externalPlayer && deepLinks.externalPlayer.web) {
+            return deepLinks.externalPlayer.web;
+        }
+        // Otherwise keep original priority (player → external fallbacks)
+        if (deepLinks.player) return deepLinks.player;
+        if (deepLinks.externalPlayer) {
+            if (deepLinks.externalPlayer.web) return deepLinks.externalPlayer.web;
+            if (deepLinks.externalPlayer.openPlayer && deepLinks.externalPlayer.openPlayer[platform.name]) {
+                return deepLinks.externalPlayer.openPlayer[platform.name];
+            }
+            if (deepLinks.externalPlayer.playlist) return deepLinks.externalPlayer.playlist;
+        }
+        return null;
+    }, [deepLinks, streamingServer?.baseUrl, platform.name]);
 
     const download = React.useMemo(() => {
         return href === deepLinks?.externalPlayer?.playlist ?
@@ -79,10 +80,7 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
     }, [href, deepLinks]);
 
     const target = React.useMemo(() => {
-        return href === deepLinks?.externalPlayer?.web ?
-            '_blank'
-            :
-            null;
+        return href && deepLinks?.externalPlayer?.web && href === deepLinks.externalPlayer.web ? '_blank' : null;
     }, [href, deepLinks]);
 
     const streamLink = React.useMemo(() => {

@@ -196,7 +196,7 @@ const Sports: React.FC = () => {
     };
 
     return (
-        <MainNavBars className={styles['sports-container']} route={'sports'} title={'SageStreams'}>
+        <MainNavBars className={styles['sports-container']} route={'sports'} title={'sagestreams'}>
             <div className={classnames(styles['sports-content'], 'animation-fade-in')}>
                 {loading ? (
                     <div className={styles['message']}>

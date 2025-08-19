@@ -112,7 +112,7 @@ const Addons = ({ urlParams, queryParams }) => {
         clearSharedAddon();
     }, [urlParams, queryParams]);
     return (
-        <MainNavBars className={styles['addons-container']} route={'addons'} title={'SageStreams'}>
+        <MainNavBars className={styles['addons-container']} route={'addons'} title={'sagestreams'}>
             <div className={styles['addons-content']}>
                 <div className={styles['selectable-inputs-container']}>
                     {selectInputs.map((selectInput, index) => (
@@ -312,7 +312,7 @@ Addons.propTypes = {
 };
 
 const AddonsFallback = () => (
-    <MainNavBars className={styles['addons-container']} route={'addons'} title={'SageStreams'} />
+    <MainNavBars className={styles['addons-container']} route={'addons'} title={'sagestreams'} />
 );
 
 module.exports = withCoreSuspender(Addons, AddonsFallback);

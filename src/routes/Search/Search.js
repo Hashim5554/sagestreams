@@ -46,7 +46,7 @@ const Search = ({ queryParams }) => {
         onVisibleRangeChange();
     }, [search.catalogs, onVisibleRangeChange]);
     return (
-        <MainNavBars className={styles['search-container']} route={'search'} query={query} title={'SageStreams'}>
+        <MainNavBars className={styles['search-container']} route={'search'} query={query} title={'sagestreams'}>
             <div ref={scrollContainerRef} className={styles['search-content']} onScroll={onScroll}>
                 {
                     query === null ?
@@ -132,7 +132,7 @@ Search.propTypes = {
 };
 
 const SearchFallback = ({ queryParams }) => (
-    <MainNavBars className={styles['search-container']} route={'search'} query={queryParams.get('search') ?? queryParams.get('query')} title={'SageStreams'} />
+    <MainNavBars className={styles['search-container']} route={'search'} query={queryParams.get('search') ?? queryParams.get('query')} title={'sagestreams'} />
 );
 
 SearchFallback.propTypes = Search.propTypes;
