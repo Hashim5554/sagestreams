@@ -104,7 +104,7 @@ const SearchBar = React.memo(({ className, query, active }) => {
                         ref={searchInputRef}
                         className={styles['search-input']}
                         type={'text'}
-                        placeholder={t('SEARCH_OR_PASTE_LINK')}
+                        placeholder={'Search'}
                         defaultValue={query}
                         tabIndex={-1}
                         onChange={queryInputOnChange}
@@ -113,7 +113,7 @@ const SearchBar = React.memo(({ className, query, active }) => {
                     />
                     :
                     <div className={styles['search-input']}>
-                        <div className={styles['placeholder-label']}>{ t('SEARCH_OR_PASTE_LINK') }</div>
+                        <div className={styles['placeholder-label']}>{ 'Search' }</div>
                     </div>
             }
             {

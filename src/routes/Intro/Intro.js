@@ -159,12 +159,8 @@ const Intro = ({ queryParams }) => {
         });
     }, [state.email, state.password]);
     const loginAsGuest = React.useCallback(() => {
-        if (!state.termsAccepted) {
-            dispatch({ type: 'error', error: 'You must accept the Terms of Service' });
-            return;
-        }
         window.location = '#/';
-    }, [state.termsAccepted]);
+    }, []);
     const signup = React.useCallback(() => {
         if (typeof state.email !== 'string' || state.email.length === 0 || !emailRef.current.validity.valid) {
             dispatch({ type: 'error', error: 'Invalid email' });
@@ -178,14 +174,6 @@ const Intro = ({ queryParams }) => {
             dispatch({ type: 'error', error: 'Passwords do not match' });
             return;
         }
-        if (!state.termsAccepted) {
-            dispatch({ type: 'error', error: 'You must accept the Terms of Service' });
-            return;
-        }
-        if (!state.privacyPolicyAccepted) {
-            dispatch({ type: 'error', error: 'You must accept the Privacy Policy' });
-            return;
-        }
         openLoaderModal();
         core.transport.dispatch({
             action: 'Ctx',
@@ -196,15 +184,15 @@ const Intro = ({ queryParams }) => {
                     email: state.email,
                     password: state.password,
                     gdpr_consent: {
-                        tos: state.termsAccepted,
-                        privacy: state.privacyPolicyAccepted,
-                        marketing: state.marketingAccepted,
+                        tos: true, // Always accept since we removed the checkbox
+                        privacy: true, // Always accept since we removed the checkbox
+                        marketing: false, // Default to false since we removed the checkbox
                         from: 'web'
                     }
                 }
             }
         });
-    }, [state.email, state.password, state.confirmPassword, state.termsAccepted, state.privacyPolicyAccepted, state.marketingAccepted]);
+    }, [state.email, state.password, state.confirmPassword]);
     const emailOnChange = React.useCallback((event) => {
         dispatch({
             type: 'change-credentials',
@@ -337,28 +325,6 @@ const Intro = ({ queryParams }) => {
                                     onChange={confirmPasswordOnChange}
                                     onSubmit={confirmPasswordOnSubmit}
                                 />
-                                <Checkbox
-                                    ref={termsRef}
-                                    label={t('READ_AND_AGREE')}
-                                    link={t('TOS')}
-                                    href={'https://www.stremio.com/tos'}
-                                    checked={state.termsAccepted}
-                                    onChange={toggleTermsAccepted}
-                                />
-                                <Checkbox
-                                    ref={privacyPolicyRef}
-                                    label={t('READ_AND_AGREE')}
-                                    link={t('PRIVACY_POLICY')}
-                                    href={'https://www.stremio.com/privacy'}
-                                    checked={state.privacyPolicyAccepted}
-                                    onChange={togglePrivacyPolicyAccepted}
-                                />
-                                <Checkbox
-                                    ref={marketingRef}
-                                    label={t('MARKETING_AGREE')}
-                                    checked={state.marketingAccepted}
-                                    onChange={toggleMarketingAccepted}
-                                />
                             </React.Fragment>
                             :
                             <div className={styles['forgot-password-link-container']}>
@@ -374,16 +340,16 @@ const Intro = ({ queryParams }) => {
                     <Button className={classnames(styles['form-button'], styles['submit-button'])} onClick={state.form === SIGNUP_FORM ? signup : loginWithEmail}>
                         <div className={styles['label']}>{state.form === SIGNUP_FORM ? t('SIGN_UP') : t('LOG_IN')}</div>
                     </Button>
+                    {
+                        state.form === SIGNUP_FORM ?
+                            <Button className={classnames(styles['form-button'], styles['guest-login-button'])} onClick={loginAsGuest}>
+                                <div className={classnames(styles['label'], styles['uppercase'])}>{t('GUEST_LOGIN')}</div>
+                            </Button>
+                            :
+                            null
+                    }
                 </div>
                 <div className={styles['options-container']}>
-                    <Button className={classnames(styles['form-button'], styles['facebook-button'])} onClick={loginWithFacebook}>
-                        <Icon className={styles['icon']} name={'facebook'} />
-                        <div className={styles['label']}>{t('FB_LOGIN')}</div>
-                    </Button>
-                    <Button className={classnames(styles['form-button'], styles['apple-button'])} onClick={loginWithApple}>
-                        <Icon className={styles['icon']} name={'macos'} />
-                        <div className={styles['label']}>{t('APPLE_LOGIN')}</div>
-                    </Button>
                     {
                         state.form === SIGNUP_FORM ?
                             <Button className={classnames(styles['form-button'], styles['login-form-button'])} onClick={switchFormOnClick}>
@@ -396,14 +362,6 @@ const Intro = ({ queryParams }) => {
                         state.form === LOGIN_FORM ?
                             <Button className={classnames(styles['form-button'], styles['signup-form-button'])} onClick={switchFormOnClick}>
                                 <div className={classnames(styles['label'], styles['uppercase'])}>{t('SIGN_UP_EMAIL')}</div>
-                            </Button>
-                            :
-                            null
-                    }
-                    {
-                        state.form === SIGNUP_FORM ?
-                            <Button className={classnames(styles['form-button'], styles['guest-login-button'])} onClick={loginAsGuest}>
-                                <div className={classnames(styles['label'], styles['uppercase'])}>{t('GUEST_LOGIN')}</div>
                             </Button>
                             :
                             null

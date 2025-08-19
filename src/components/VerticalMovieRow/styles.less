@@ -345,3 +345,33 @@
         }
     }
 }
+
+@media only screen and (max-width: 600px) {
+	.vertical-movie-row {
+		padding: 1rem;
+		margin: 1rem auto;
+
+		.stacked-container {
+			height: 360px;
+		}
+
+		.stacked-container .stacked-item {
+			width: 240px;
+			height: 360px;
+		}
+
+		/* Tighter offsets on very small screens */
+		.stacked-container .stacked-item.next {
+			transform: scale(0.82) translateX(160px) rotateY(-10deg);
+		}
+		.stacked-container .stacked-item.next2 {
+			transform: scale(0.66) translateX(260px) rotateY(-18deg);
+		}
+		.stacked-container .stacked-item.prev {
+			transform: scale(0.82) translateX(-160px) rotateY(10deg);
+		}
+		.stacked-container .stacked-item.prev2 {
+			transform: scale(0.66) translateX(-260px) rotateY(18deg);
+		}
+	}
+}

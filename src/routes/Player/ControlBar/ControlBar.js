@@ -92,7 +92,10 @@ const ControlBar = ({
             }
         }
     }, [muted, onMuteRequested, onUnmuteRequested]);
-    const onChromecastButtonClick = React.useCallback(() => {
+    const onChromecastButtonClick = React.useCallback((event) => {
+        // Prevent the menu from handling this click as another action (e.g., audio menu)
+        try { event && event.preventDefault && event.preventDefault(); } catch(_) {}
+        try { event && event.stopPropagation && event.stopPropagation(); } catch(_) {}
         chromecast.transport.requestSession();
     }, []);
     React.useEffect(() => {
@@ -148,6 +151,10 @@ const ControlBar = ({
                         />
                         : null
                 }
+                {/* Prominent Cast button, outside the overflow menu */}
+                <Button className={classnames(styles['control-bar-button'], styles['cast-button'], { 'disabled': !chromecastServiceActive })} title={'Cast'} tabIndex={-1} onClick={onChromecastButtonClick}>
+                    <Icon className={styles['icon']} name={'cast'} />
+                </Button>
                 <div className={styles['spacing']} />
                 <Button className={styles['control-bar-buttons-menu-button']} onClick={toggleButtonsMenu}>
                     <Icon className={styles['icon']} name={'more-vertical'} />

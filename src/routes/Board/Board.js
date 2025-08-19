@@ -25,12 +25,8 @@ const Board = () => {
     const profile = useProfile();
     const boardCatalogsOffset = continueWatchingPreview.items.length > 0 ? 1 : 0;
     const scrollContainerRef = React.useRef();
-    const streamingServerWarningDismissed = React.useMemo(() => {
-        return streamingServer.settings !== null && streamingServer.settings.type === 'Ready' || (
-            !isNaN(profile.settings.streamingServerWarningDismissed.getTime()) &&
-            profile.settings.streamingServerWarningDismissed.getTime() > Date.now()
-        );
-    }, [profile.settings, streamingServer.settings]);
+    // Always treat streaming server warning as dismissed to avoid showing the banner
+    const streamingServerWarningDismissed = true;
     const onVisibleRangeChange = React.useCallback(() => {
         const range = getVisibleChildrenRange(scrollContainerRef.current);
         if (range === null) {
@@ -68,12 +64,31 @@ const Board = () => {
                             :
                             null
                     }
-                    {board.catalogs.map((catalog, index) => {
+                    {board.catalogs
+                        .filter(catalog => {
+                            // Hide only Torrentio catalogs on the home page
+                            if (catalog.addon) {
+                                const addonId = catalog.addon.manifest.id;
+                                if (addonId === 'org.stremio.torrentio') {
+                                    return false;
+                                }
+                                const addonName = catalog.addon.manifest.name || '';
+                                if (addonName === 'Torrentio') {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        })
+                        .map((catalog, index) => {
                         switch (catalog.content?.type) {
                             case 'Ready': {
                                 const catalogTitle = t.catalogTitle(catalog);
                                 const isFeaturedMovies = catalogTitle === 'Movies You May Like';
                                 const isFeaturedSeries = catalogTitle === 'Series You May Like';
+                                const isUsaTvCatalog = !!catalog.addon && (
+                                    catalog.addon.manifest.id === 'com.usatv.addon' ||
+                                    (catalog.addon.manifest.name || '') === 'USA TV'
+                                );
                                 
                                 // Use VerticalMovieRow for featured sections
                                 if (isFeaturedMovies || isFeaturedSeries) {
@@ -92,6 +107,7 @@ const Board = () => {
                                     <MetaRow
                                         key={index}
                                         className={classnames(styles['board-row'], styles[`board-row-${catalog.content.content[0].posterShape}`], 'animation-fade-in')}
+                                        title={isUsaTvCatalog ? 'TV Channels' : undefined}
                                         catalog={catalog}
                                         itemComponent={MetaItem}
                                     />
@@ -103,6 +119,7 @@ const Board = () => {
                                         <MetaRow
                                             key={index}
                                             className={classnames(styles['board-row'], 'animation-fade-in')}
+                                            title={(catalog.addon && (catalog.addon.manifest.id === 'com.usatv.addon' || (catalog.addon.manifest.name || '') === 'USA TV')) ? 'TV Channels' : undefined}
                                             catalog={catalog}
                                             message={catalog.content.content}
                                         />
@@ -116,7 +133,7 @@ const Board = () => {
                                         key={index}
                                         className={classnames(styles['board-row'], styles['board-row-poster'], 'animation-fade-in')}
                                         catalog={catalog}
-                                        title={t.catalogTitle(catalog)}
+                                        title={(catalog.addon && (catalog.addon.manifest.id === 'com.usatv.addon' || (catalog.addon.manifest.name || '') === 'USA TV')) ? 'TV Channels' : t.catalogTitle(catalog)}
                                     />
                                 );
                             }
@@ -124,12 +141,7 @@ const Board = () => {
                     })}
                 </div>
             </MainNavBars>
-            {
-                !streamingServerWarningDismissed ?
-                    <StreamingServerWarning className={styles['board-warning-container']} />
-                    :
-                    null
-            }
+            {null}
         </div>
     );
 };

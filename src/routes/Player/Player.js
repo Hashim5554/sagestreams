@@ -37,6 +37,18 @@ const Player = ({ urlParams, queryParams }) => {
         return queryParams.has('forceTranscoding');
     }, [queryParams]);
 
+    // External source support (e.g. from Sports)
+    const externalSource = React.useMemo(() => {
+        const src = queryParams.get('source');
+        try {
+            return typeof src === 'string' && src.length > 0 ? decodeURIComponent(src) : null;
+        } catch {
+            return src;
+        }
+    }, [queryParams]);
+    const externalTitle = React.useMemo(() => queryParams.get('title') || null, [queryParams]);
+    const isLiveFlag = React.useMemo(() => queryParams.get('live') === '1', [queryParams]);
+
     const [player, videoParamsChanged, timeChanged, seek, pausedChanged, ended, nextVideo] = usePlayer(urlParams);
     const [settings, updateSettings] = useSettings();
     const streamingServer = useStreamingServer();
@@ -136,6 +148,15 @@ const Player = ({ urlParams, queryParams }) => {
     const onError = React.useCallback((error) => {
         console.error('Player', error);
         const messageText = (error?.message || '').toString().toLowerCase();
+        // Suppress benign AbortError play/pause races
+        if (
+            messageText.includes('play() request was interrupted') ||
+            messageText.includes('aborterror') ||
+            messageText.includes('interrupted by a call to pause') ||
+            messageText.includes('request was interrupted by a new load request')
+        ) {
+            return;
+        }
         const looksUnsupported = messageText.includes('not supported') || messageText.includes('unsupported');
         if (error.critical) {
             setError(error);
@@ -189,17 +210,25 @@ const Player = ({ urlParams, queryParams }) => {
     }, []);
 
     const onPlayRequested = React.useCallback(() => {
+        // Add protection against rapid calls
+        if (video.state.paused === false) {
+            return; // Already playing, ignore
+        }
         video.setProp('paused', false);
         setSeeking(false);
-    }, []);
+    }, [video.state.paused]);
 
-    const onPlayRequestedDebounced = React.useCallback(debounce(onPlayRequested, 200), []);
+    const onPlayRequestedDebounced = React.useCallback(debounce(onPlayRequested, 200), [onPlayRequested]);
 
     const onPauseRequested = React.useCallback(() => {
+        // Add protection against rapid calls
+        if (video.state.paused === true) {
+            return; // Already paused, ignore
+        }
         video.setProp('paused', true);
-    }, []);
+    }, [video.state.paused]);
 
-    const onPauseRequestedDebounced = React.useCallback(debounce(onPauseRequested, 200), []);
+    const onPauseRequestedDebounced = React.useCallback(debounce(onPauseRequested, 200), [onPauseRequested]);
     const onMuteRequested = React.useCallback(() => {
         video.setProp('muted', true);
     }, []);
@@ -337,7 +366,26 @@ const Player = ({ urlParams, queryParams }) => {
         setError(null);
         video.unload();
 
-        if (player.selected && streamingServer.settings?.type !== 'Loading') {
+        if (externalSource) {
+            // Load external HTTP(s) stream directly into player
+            video.load({
+                stream: {
+                    url: externalSource,
+                    name: externalTitle || 'Live Stream',
+                    subtitles: []
+                },
+                autoplay: true,
+                time: 0,
+                forceTranscoding: false,
+                maxAudioChannels: settings.surroundSound ? 32 : 2,
+                hardwareDecoding: settings.hardwareDecoding,
+                streamingServerURL: null,
+                seriesInfo: null,
+            }, {
+                chromecastTransport: services.chromecast.active ? services.chromecast.transport : null,
+                shellTransport: services.shell.active ? services.shell.transport : null,
+            });
+        } else if (player.selected && streamingServer.settings?.type !== 'Loading') {
             video.load({
                 stream: {
                     ...player.selected.stream,
@@ -373,7 +421,7 @@ const Player = ({ urlParams, queryParams }) => {
                 shellTransport: services.shell.active ? services.shell.transport : null,
             });
         }
-    }, [streamingServer.baseUrl, player.selected, forceTranscoding, casting]);
+    }, [externalSource, externalTitle, streamingServer.baseUrl, player.selected, forceTranscoding, casting]);
     React.useEffect(() => {
         if (video.state.stream !== null) {
             const tracks = player.subtitles.map((subtitles) => ({
@@ -736,7 +784,7 @@ const Player = ({ urlParams, queryParams }) => {
     }, []);
 
     return (
-        <div className={classnames(styles['player-container'], { [styles['overlayHidden']]: overlayHidden })}
+        <div className={classnames(styles['player-container'], { 'overlayHidden': overlayHidden })}
             onMouseDown={onContainerMouseDown}
             onMouseMove={onContainerMouseMove}
             onMouseOver={onContainerMouseMove}

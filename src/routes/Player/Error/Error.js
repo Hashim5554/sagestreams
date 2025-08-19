@@ -18,32 +18,8 @@ const Error = React.forwardRef(({ className, code, message, stream }, ref) => {
         ];
     }, [stream]);
 
-    return (
-        <div ref={ref} className={classNames(className, styles['error'])}>
-            <div className={styles['error-label']} title={message}>{message}</div>
-            {
-                code === 2 ?
-                    <div className={styles['error-sub']} title={t('EXTERNAL_PLAYER_HINT')}>{t('EXTERNAL_PLAYER_HINT')}</div>
-                    :
-                    null
-            }
-            {
-                playlist && fileName ?
-                    <Button
-                        className={styles['playlist-button']}
-                        title={t('PLAYER_OPEN_IN_EXTERNAL')}
-                        href={playlist}
-                        download={fileName}
-                        target={'_blank'}
-                    >
-                        <Icon className={styles['icon']} name={'ic_downloads'} />
-                        <div className={styles['label']}>{t('PLAYER_OPEN_IN_EXTERNAL')}</div>
-                    </Button>
-                    :
-                    null
-            }
-        </div>
-    );
+    // Hide the error overlay UI entirely; keep component mounted but render nothing
+    return null;
 });
 
 Error.propTypes = {

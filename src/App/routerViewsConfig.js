@@ -4,6 +4,7 @@ const routes = require('stremio/routes');
 const { routesRegexp } = require('stremio/common');
 
 const SportsRoute = require('../routes/Sports');
+const PopupPlayerRoute = require('../routes/Sports/PopupPlayer');
 
 const routerViewsConfig = [
     [
@@ -43,6 +44,13 @@ const routerViewsConfig = [
     ],
     [
         {
+            regexp: /^\/popup-player$/,
+            urlParamsNames: [],
+            component: PopupPlayerRoute
+        }
+    ],
+    [
+        {
             ...routesRegexp.metadetails,
             component: routes.MetaDetails
         }
@@ -58,6 +66,11 @@ const routerViewsConfig = [
         }
     ],
     [
+        {
+            regexp: /^\/player$/,
+            urlParamsNames: [],
+            component: routes.Player
+        },
         {
             ...routesRegexp.player,
             component: routes.Player

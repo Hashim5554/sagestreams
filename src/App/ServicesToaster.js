@@ -23,6 +23,24 @@ const ServicesToaster = () => {
                         break;
                     }
 
+                    // Suppress noisy addon re-install errors
+                    // - core reports an Error event when attempting to install an already-installed addon
+                    // - we want to hide those completely from the user
+                    try {
+                        const msg = (args?.error?.message || '').toString().toLowerCase();
+                        const srcEvent = (args?.source?.event || '').toString();
+                        const isAddonInstallEvent = srcEvent === 'AddonInstalled' || srcEvent === 'InstallAddon';
+                        const mentionsAlreadyInstalled = msg.includes('already installed');
+                        const mentionsAddonInstalled = msg.includes('addon is already installed');
+                        const isAbortPlayPause = msg.includes('play() request was interrupted') || msg.includes('aborterror') || msg.includes('interrupted by a call to pause') || msg.includes('request was interrupted by a new load request');
+                        if (isAddonInstallEvent && (mentionsAlreadyInstalled || mentionsAddonInstalled)) {
+                            break;
+                        }
+                        if (isAbortPlayPause) {
+                            break;
+                        }
+                    } catch (_) { /* ignore */ }
+
                     toast.show({
                         type: 'error',
                         title: args.source.event,

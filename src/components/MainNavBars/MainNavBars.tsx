@@ -10,7 +10,7 @@ const TABS = [
 	{ id: 'board', label: 'Board', icon: 'home', href: '#/' },
 	{ id: 'discover', label: 'Discover', icon: 'discover', href: '#/discover' },
 	{ id: 'library', label: 'Library', icon: 'library', href: '#/library' },
-	{ id: 'sports', label: 'Sports', icon: 'discover', href: '#/sports' },
+	{ id: 'sports', label: 'Sports', icon: '⚽', href: '#/sports', isEmoji: true },
 	{ id: 'addons', label: 'ADDONS', icon: 'addons', href: '#/addons' },
 	{ id: 'settings', label: 'SETTINGS', icon: 'settings', href: '#/settings' },
 ];
@@ -31,7 +31,7 @@ const MainNavBars = memo(({ className, route, query, title, children }: Props) =
                 route={route}
                 query={query}
                 title={title}
-                backButton={false}
+                backButton={route === 'metadetails'}
                 searchBar={true}
                 fullscreenButton={true}
                 navMenu={true}

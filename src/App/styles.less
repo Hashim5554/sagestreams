@@ -13,6 +13,21 @@
     @import (once, less) '~stremio-router/styles.css';
 }
 
+// Force-hide webpack/react development error overlays in the browser
+:global(#webpack-dev-server-client-overlay),
+:global(webpack-dev-server-client-overlay),
+:global(#webpack-dev-server-overlay),
+:global(.webpack-dev-server-overlay),
+:global([data-webpack-dev-server-overlay]),
+:global(#react-error-overlay),
+:global(iframe#react-error-overlay),
+:global(iframe[src*="webpack-dev-server"][src*="overlay"]) {
+	display: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+}
+
 // iOS pads the bottom inset more than needed, so we deduce the actual inset size when using the webapp
 @calculated-bottom-safe-inset: ~"min(env(safe-area-inset-bottom, 0rem), max(1rem, calc(var(--viewport-height-diff) - env(safe-area-inset-top, 0rem))))";
 

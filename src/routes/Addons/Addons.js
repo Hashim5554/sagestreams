@@ -87,12 +87,21 @@ const Addons = ({ urlParams, queryParams }) => {
     const closeAddonDetails = React.useCallback(() => {
         setAddonDetailsTransportUrl(null);
     }, [setAddonDetailsTransportUrl]);
-    const searchFilterPredicate = React.useCallback((addon) => {
-        return search.length === 0 ||
-            (
-                (typeof addon.manifest.name === 'string' && addon.manifest.name.toLowerCase().includes(search.toLowerCase())) ||
-                (typeof addon.manifest.description === 'string' && addon.manifest.description.toLowerCase().includes(search.toLowerCase()))
-            );
+    const addonsVisibilityPredicate = React.useCallback((addon) => {
+        // Hide auto-installed/hidden addons (Torrentio, USA TV, Peario)
+        const id = addon?.manifest?.id || '';
+        const transportUrl = addon?.transportUrl || '';
+        const hidden = addon?.manifest?._hidden === true;
+        if (hidden) return false;
+        if (id === 'org.stremio.torrentio' || id === 'com.usatv.addon') return false;
+        if (transportUrl === 'https://addon.peario.xyz/manifest.json') return false;
+
+        // Apply search filter
+        if (search.length === 0) return true;
+        const name = (addon?.manifest?.name || '').toLowerCase();
+        const description = (addon?.manifest?.description || '').toLowerCase();
+        const term = search.toLowerCase();
+        return name.includes(term) || description.includes(term);
     }, [search]);
     const renderLogoFallback = React.useCallback(() => (
         <Icon className={styles['icon']} name={'addons'} />
@@ -129,7 +138,7 @@ const Addons = ({ urlParams, queryParams }) => {
                     </Button>
                 </div>
                 {
-                    installedAddons.selected !== null ?
+                    (typeof urlParams.transportUrl !== 'string' || typeof urlParams.catalogId !== 'string') ?
                         installedAddons.selectable.types.length === 0 ?
                             <div className={styles['message-container']}>
                                 {t('NO_ADDONS')}
@@ -143,7 +152,7 @@ const Addons = ({ urlParams, queryParams }) => {
                                 <div className={styles['addons-list-container']}>
                                     {
                                         installedAddons.catalog
-                                            .filter(searchFilterPredicate)
+                                            .filter(addonsVisibilityPredicate)
                                             .map((addon, index) => (
                                                 <Addon
                                                     key={index}
@@ -183,7 +192,7 @@ const Addons = ({ urlParams, queryParams }) => {
                                     <div className={styles['addons-list-container']}>
                                         {
                                             remoteAddons.catalog.content.content
-                                                .filter(searchFilterPredicate)
+                                                .filter(addonsVisibilityPredicate)
                                                 .map((addon, index) => (
                                                     <Addon
                                                         key={index}

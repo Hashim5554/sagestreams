@@ -104,7 +104,23 @@ const EXTERNAL_PLAYERS = [
     },
 ];
 
-const WHITELISTED_HOSTS = ['stremio.com', 'strem.io', 'stremio.zendesk.com', 'google.com', 'youtube.com', 'twitch.tv', 'twitter.com', 'x.com', 'netflix.com', 'adex.network', 'amazon.com', 'forms.gle'];
+const WHITELISTED_HOSTS = [
+    'stremio.com',
+    'strem.io',
+    'stremio.zendesk.com',
+    'google.com',
+    'youtube.com',
+    'twitch.tv',
+    'twitter.com',
+    'x.com',
+    'netflix.com',
+    'adex.network',
+    'amazon.com',
+    'forms.gle',
+    // Allow local streaming server and dev setups without the external warning page
+    '127.0.0.1',
+    'localhost'
+];
 
 const PROTOCOL = 'stremio:';
 

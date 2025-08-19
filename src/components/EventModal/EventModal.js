@@ -30,7 +30,8 @@ const EventModal = () => {
 
     return (
         modal !== null ?
-            <ModalDialog className={styles['event-modal']} onCloseRequest={onClose}>
+            // Hide event modal overlay entirely to avoid intrusive popups
+            null /* <ModalDialog className={styles['event-modal']} onCloseRequest={onClose}>
                 {
                     modal.imageUrl ?
                         <img className={styles['image']} src={modal.imageUrl} />
@@ -81,7 +82,7 @@ const EventModal = () => {
                                 null
                     }
                 </div>
-            </ModalDialog>
+            </ModalDialog> */
             :
             null
     );

@@ -23,6 +23,18 @@ const mapSelectableInputs = (discover, t) => {
     };
     const catalogSelect = {
         options: discover.selectable.catalogs
+            .filter(({ addon }) => {
+                // Hide specific addon IDs that we auto-install
+                if (addon.manifest.id === 'org.stremio.torrentio' || addon.manifest.id === 'com.usatv.addon') {
+                    return false;
+                }
+                // Hide addons with specific names
+                const addonName = addon.manifest.name || '';
+                if (addonName === 'Torrentio' || addonName === 'USA TV') {
+                    return false;
+                }
+                return true;
+            })
             .map(({ id, name, addon, deepLinks }) => ({
                 value: deepLinks.discover,
                 label: t.catalogTitle({ addon, id, name }),
@@ -40,7 +52,7 @@ const mapSelectableInputs = (discover, t) => {
             :
             t.string('SELECT_CATALOG'),
         onSelect: (value) => {
-            window.location =value;
+            window.location = value;
         }
     };
     const extraSelects = discover.selectable.extra.map(({ name, isRequired, options }) => {

@@ -143,12 +143,22 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
     ), []);
 
     const renderLabel = React.useMemo(() => function renderLabel({ className, children, ...props }) {
+        // Handle empty addon names - show as "Torrentio" for empty names
+        const getDisplayAddonName = (addonName) => {
+            if (addonName === '' || addonName === null || addonName === undefined) {
+                return 'Torrentio';
+            }
+            return addonName;
+        };
+
+        const displayAddonName = getDisplayAddonName(addonName);
+        
         return (
-            <Button className={classnames(className, styles['stream-container'])} title={addonName} href={href} target={target} download={download} onClick={onClick} {...props}>
+            <Button className={classnames(className, styles['stream-container'])} title={displayAddonName} href={href} target={target} download={download} onClick={onClick} {...props}>
                 <div className={styles['info-container']}>
                     {
                         typeof thumbnail === 'string' && thumbnail.length > 0 ?
-                            <div className={styles['thumbnail-container']} title={name || addonName}>
+                            <div className={styles['thumbnail-container']} title={name || displayAddonName}>
                                 <Image
                                     className={styles['thumbnail']}
                                     src={thumbnail}
@@ -157,8 +167,8 @@ const Stream = ({ className, videoId, videoReleased, addonName, name, descriptio
                                 />
                             </div>
                             :
-                            <div className={styles['addon-name-container']} title={name || addonName}>
-                                <div className={styles['addon-name']}>{name || addonName}</div>
+                            <div className={styles['addon-name-container']} title={name || displayAddonName}>
+                                <div className={styles['addon-name']}>{name || displayAddonName}</div>
                             </div>
                     }
                     {

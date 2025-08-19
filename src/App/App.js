@@ -15,10 +15,29 @@ const ErrorDialog = require('./ErrorDialog');
 const withProtectedRoutes = require('./withProtectedRoutes');
 const routerViewsConfig = require('./routerViewsConfig');
 const styles = require('./styles');
+const { useRouteFocused } = require('stremio-router');
+const { useServices } = require('stremio/services');
+const { useProfile } = require('stremio/common');
+const { useStreamingServer } = require('stremio/common');
+const { useNotifications } = require('stremio/common');
+const { useEventModal } = require('stremio/common');
+const { useToast } = require('stremio/common');
+const { useBinaryState } = require('stremio/common');
+const { MainNavBars, ModalDialog, EventModal } = require('stremio/components');
+const useAutoInstallAddons = require('../common/useAutoInstallAddons');
+
+// Separate component to handle auto-install addons
+const AutoInstallAddons = () => {
+    useAutoInstallAddons();
+    return null;
+};
+
+// Wrap with CoreSuspender to ensure core is ready
+const AutoInstallAddonsWithSuspender = withCoreSuspender(AutoInstallAddons);
 
 const RouterWithProtectedRoutes = withCoreSuspender(withProtectedRoutes(Router));
 
-const App = () => {
+const App = ({ onRouteChange }) => {
     const { i18n } = useTranslation();
     const shell = useShell();
     const onPathNotMatch = React.useCallback(() => {
@@ -191,6 +210,7 @@ const App = () => {
             }
         };
     }, [initialized, shell.windowClosed]);
+
     return (
         <React.StrictMode>
             <ServicesProvider services={services}>
@@ -207,6 +227,8 @@ const App = () => {
                                             <DeepLinkHandler />
                                             <SearchParamsHandler />
                                             <UpdaterBanner className={styles['updater-banner-container']} />
+                                            {/* Initialize auto-install addons only when core is ready */}
+                                            <AutoInstallAddonsWithSuspender />
                                             <RouterWithProtectedRoutes
                                                 className={styles['router']}
                                                 viewsConfig={routerViewsConfig}

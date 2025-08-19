@@ -115,3 +115,26 @@
         }
     }
 }
+
+@media (max-width: 800px) {
+	/* When used in mobile drawer */
+	.mobile-search-bar.search-bar-container {
+		--search-bar-size: 2.4rem;
+		border-radius: 0.6rem;
+		background-color: rgba(255,255,255,0.08);
+		backdrop-filter: blur(8px);
+	}
+	.mobile-search-bar .search-input {
+		padding-left: 0.9rem;
+	}
+	.mobile-search-bar .search-input::placeholder,
+	.mobile-search-bar .search-input .placeholder-label {
+		color: #ffffff;
+		opacity: 0.85;
+	}
+	.mobile-search-bar .submit-button-container .icon {
+		color: #ffffff;
+		opacity: 1;
+		transform: translateY(-2px);
+	}
+}

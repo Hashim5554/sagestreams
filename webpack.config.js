@@ -194,7 +194,11 @@ module.exports = (env, argv) => ({
         static: false,
         hot: false,
         server: 'https',
-        liveReload: false
+        liveReload: false,
+        client: {
+            overlay: false,
+            logging: 'none'
+        }
     },
     optimization: {
         minimize: true,

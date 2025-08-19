@@ -67,13 +67,27 @@ const StreamsList = ({ className, video, type, onEpisodeSearch, ...props }) => {
             }, {});
     }, [props.streams]);
     const filteredStreams = React.useMemo(() => {
-        return selectedAddon === ALL_ADDONS_KEY ?
-            Object.values(streamsByAddon).map(({ streams }) => streams).flat(1)
-            :
-            streamsByAddon[selectedAddon] ?
-                streamsByAddon[selectedAddon].streams
-                :
-                [];
+        if (selectedAddon === ALL_ADDONS_KEY) {
+            return Object.values(streamsByAddon)
+                .flatMap(({ streams }) => streams)
+                .filter(stream => {
+                    // Only hide streams that explicitly have these addon names
+                    const addonName = stream.addonName || '';
+                    // Don't filter out streams, just let them show normally
+                    return true;
+                });
+        } else {
+            const addonStreams = streamsByAddon[selectedAddon];
+            if (addonStreams) {
+                return addonStreams.streams.filter(stream => {
+                    // Only hide streams that explicitly have these addon names
+                    const addonName = stream.addonName || '';
+                    // Don't filter out streams, just let them show normally
+                    return true;
+                });
+            }
+            return [];
+        }
     }, [streamsByAddon, selectedAddon]);
     const selectableOptions = React.useMemo(() => {
         return {
@@ -83,11 +97,30 @@ const StreamsList = ({ className, video, type, onEpisodeSearch, ...props }) => {
                     label: t('ALL_ADDONS'),
                     title: t('ALL_ADDONS')
                 },
-                ...Object.keys(streamsByAddon).map((transportUrl) => ({
-                    value: transportUrl,
-                    label: streamsByAddon[transportUrl].addon.manifest.name,
-                    title: streamsByAddon[transportUrl].addon.manifest.name,
-                }))
+                ...Object.keys(streamsByAddon)
+                    .filter(transportUrl => {
+                        const addon = streamsByAddon[transportUrl].addon;
+                        // Hide specific addon IDs that we auto-install
+                        if (addon.manifest.id === 'org.stremio.torrentio' || addon.manifest.id === 'com.usatv.addon') {
+                            return false;
+                        }
+                        // Hide addons with specific names
+                        const addonName = addon.manifest.name || '';
+                        if (addonName === 'Torrentio' || addonName === 'USA TV') {
+                            return false;
+                        }
+                        return true;
+                    })
+                    .map((transportUrl) => {
+                        const addon = streamsByAddon[transportUrl].addon;
+                        const displayName = addon.manifest.name || addon.manifest.id;
+                        
+                        return {
+                            value: transportUrl,
+                            label: displayName,
+                            title: displayName,
+                        };
+                    })
             ],
             value: selectedAddon,
             onSelect: onAddonSelected
