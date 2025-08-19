@@ -26,7 +26,8 @@ const Board = () => {
     const boardCatalogsOffset = continueWatchingPreview.items.length > 0 ? 1 : 0;
     const scrollContainerRef = React.useRef();
     // Always treat streaming server warning as dismissed to avoid showing the banner
-    const streamingServerWarningDismissed = true;
+    // Show the warning when no streaming server is available (static hosting)
+    const streamingServerWarningDismissed = !!(streamingServer && streamingServer.baseUrl);
     const onVisibleRangeChange = React.useCallback(() => {
         const range = getVisibleChildrenRange(scrollContainerRef.current);
         if (range === null) {

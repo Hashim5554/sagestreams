@@ -71,18 +71,21 @@ const StreamsList = ({ className, video, type, onEpisodeSearch, ...props }) => {
             return Object.values(streamsByAddon)
                 .flatMap(({ streams }) => streams)
                 .filter(stream => {
-                    // Only hide streams that explicitly have these addon names
-                    const addonName = stream.addonName || '';
-                    // Don't filter out streams, just let them show normally
+                    const url = stream?.deepLinks?.externalPlayer?.web || stream?.deepLinks?.player || '';
+                    // On static hosting, deprioritize magnet/torrent-only entries that can't play in browser
+                    if (!url) return false;
+                    const lower = url.toLowerCase();
+                    if (lower.startsWith('magnet:') || lower.startsWith('acestream:')) return false;
                     return true;
                 });
         } else {
             const addonStreams = streamsByAddon[selectedAddon];
             if (addonStreams) {
                 return addonStreams.streams.filter(stream => {
-                    // Only hide streams that explicitly have these addon names
-                    const addonName = stream.addonName || '';
-                    // Don't filter out streams, just let them show normally
+                    const url = stream?.deepLinks?.externalPlayer?.web || stream?.deepLinks?.player || '';
+                    if (!url) return false;
+                    const lower = url.toLowerCase();
+                    if (lower.startsWith('magnet:') || lower.startsWith('acestream:')) return false;
                     return true;
                 });
             }
