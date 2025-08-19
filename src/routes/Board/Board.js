@@ -48,7 +48,7 @@ const Board = () => {
     return (
         <div className={styles['board-container']}>
             <EventModal />
-            <MainNavBars className={styles['board-content-container']} route={'board'} title={'SageStreams'}>
+            <MainNavBars className={styles['board-content-container']} route={'board'} title={'sagestreams'}>
                 <div ref={scrollContainerRef} className={styles['board-content']} onScroll={onScroll}>
                     <TrendingSlideshow />
                     <Top10Section />
@@ -148,7 +148,7 @@ const Board = () => {
 
 const BoardFallback = () => (
     <div className={styles['board-container']}>
-        <MainNavBars className={styles['board-content-container']} route={'board'} title={'SageStreams'} />
+        <MainNavBars className={styles['board-content-container']} route={'board'} title={'sagestreams'} />
     </div>
 );
 

@@ -98,7 +98,7 @@ const Discover = ({ urlParams, queryParams }) => {
         setSelectedMetaItemIndex(0);
     }, [discover.selected]);
     return (
-        <MainNavBars className={styles['discover-container']} route={'discover'} title={'SageStreams'}>
+        <MainNavBars className={styles['discover-container']} route={'discover'} title={'sagestreams'}>
             <div className={styles['discover-content']}>
                 <div className={styles['catalog-container']}>
                     <div className={styles['selectable-inputs-container']}>
@@ -240,7 +240,7 @@ Discover.propTypes = {
 };
 
 const DiscoverFallback = () => (
-            <MainNavBars className={styles['discover-container']} route={'discover'} title={'SageStreams'} />
+            <MainNavBars className={styles['discover-container']} route={'discover'} title={'sagestreams'} />
 );
 
 module.exports = withCoreSuspender(Discover, DiscoverFallback);

@@ -119,7 +119,7 @@ const HorizontalNavBar = React.memo(({ className, route, query, title, backButto
                             src={require('/images/stremio_symbol.png')}
                             alt={' '}
                         />
-                        <div className={styles['brand-title']}>SageStreams</div>
+                        <div className={styles['brand-title']}>sagestreams</div>
                     </div>
                     <Button className={styles['mobile-drawer-close']} tabIndex={-1} onClick={closeMobileMenu}>
                         <Icon className={styles['icon']} name={'close'} />
