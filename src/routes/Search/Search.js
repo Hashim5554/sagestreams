@@ -209,7 +209,8 @@ const Search = ({ queryParams }) => {
                                         );
                                     }
                                 }
-                            })
+                            })}
+                            </>
                 }
             </div>
         </MainNavBars>
