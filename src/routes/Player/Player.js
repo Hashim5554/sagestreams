@@ -68,7 +68,7 @@ const Player = ({ urlParams, queryParams }) => {
     const errorRef = React.useRef();
 
     const [immersed, setImmersed] = React.useState(true);
-    const setImmersedDebounced = React.useCallback(debounce(setImmersed, 3000), []);
+    const setImmersedDebounced = React.useCallback(debounce(setImmersed, 7000), []);
     const [, , , toggleFullscreen] = useFullscreen();
 
     const [optionsMenuOpen, , closeOptionsMenu, toggleOptionsMenu] = useBinaryState(false);

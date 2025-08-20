@@ -40,7 +40,7 @@ const Details = ({ selected, items }: Props) => {
         const ics = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//sagestreams//Calendar Export//EN',
+            'PRODID:-//SageStreams//Calendar Export//EN',
             'BEGIN:VEVENT',
             `DTSTAMP:${dt(new Date())}`,
             `DTSTART:${dt(start)}`,
