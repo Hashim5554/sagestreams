@@ -784,7 +784,7 @@ const Player = ({ urlParams, queryParams }) => {
     }, []);
 
     return (
-        <div className={classnames(styles['player-container'], { 'overlayHidden': overlayHidden })}
+        <div className={classnames(styles['player-container'], { [styles['overlayHidden']]: overlayHidden })}
             onMouseDown={onContainerMouseDown}
             onMouseMove={onContainerMouseMove}
             onMouseOver={onContainerMouseMove}
