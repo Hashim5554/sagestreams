@@ -26,6 +26,17 @@ html:not(.active-slider-within) {
     }
 }
 
+// Ensure overlays hide even if a slider is considered active
+.player-container.overlayHidden {
+    cursor: none;
+
+    .nav-bar-layer, .control-bar-layer, .menu-layer, .side-drawer-button-layer {
+        opacity: 0;
+        transition: opacity 200ms;
+        pointer-events: none;
+    }
+}
+
 .player-container {
     position: relative;
     z-index: 0;
