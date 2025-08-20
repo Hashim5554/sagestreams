@@ -13,6 +13,26 @@ const styles = require('./styles');
 
 const THRESHOLD = 100;
 
+const TMDB_API_KEY = '8c247ea0b4b56ed2ff7d41c9a833aa77';
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+
+// Simple mapping cache TMDB -> IMDb
+const TMDB_IMDB_CACHE = new Map();
+
+async function tmdbToImdb(tmdbId, contentType) {
+    const key = `${contentType}_${tmdbId}`;
+    if (TMDB_IMDB_CACHE.has(key)) return TMDB_IMDB_CACHE.get(key);
+    try {
+        const res = await fetch(`${TMDB_BASE_URL}/${contentType}/${tmdbId}/external_ids?api_key=${TMDB_API_KEY}`);
+        const json = await res.json();
+        const imdbId = json?.imdb_id || null;
+        if (imdbId) TMDB_IMDB_CACHE.set(key, imdbId);
+        return imdbId;
+    } catch {
+        return null;
+    }
+}
+
 const Search = ({ queryParams }) => {
     const t = useTranslate();
     const [search, loadSearchRows] = useSearch(queryParams);
@@ -29,6 +49,7 @@ const Search = ({ queryParams }) => {
             null;
     }, [search.selected]);
     const scrollContainerRef = React.useRef();
+    const [tmdbItems, setTmdbItems] = React.useState([]);
     const onVisibleRangeChange = React.useCallback(() => {
         if (search.catalogs.length === 0) {
             return;
@@ -42,6 +63,57 @@ const Search = ({ queryParams }) => {
         loadSearchRows(range);
     }, [search.catalogs]);
     const onScroll = React.useCallback(debounce(onVisibleRangeChange, 250), [onVisibleRangeChange]);
+
+    // TMDB federated search with mapping to IMDb → Stremio deep links
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            if (!query || query.length < 2) {
+                setTmdbItems([]);
+                return;
+            }
+            try {
+                const [moviesRes, tvRes] = await Promise.all([
+                    fetch(`${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&language=en-US&query=${encodeURIComponent(query)}&page=1&include_adult=false`),
+                    fetch(`${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=en-US&query=${encodeURIComponent(query)}&page=1&include_adult=false`)
+                ]);
+                const [moviesJson, tvJson] = await Promise.all([moviesRes.json(), tvRes.json()]);
+                const items = [];
+                for (const m of (moviesJson?.results || []).slice(0, 12)) {
+                    const imdbId = await tmdbToImdb(m.id, 'movie');
+                    if (!imdbId) continue;
+                    items.push({
+                        type: 'movie',
+                        name: m.title,
+                        poster: m.poster_path ? `https://image.tmdb.org/t/p/w342${m.poster_path}` : null,
+                        posterShape: 'poster',
+                        deepLinks: {
+                            metaDetailsStreams: `#/detail/movie/${imdbId}`,
+                            metaDetailsVideos: `#/detail/movie/${imdbId}`
+                        }
+                    });
+                }
+                for (const tv of (tvJson?.results || []).slice(0, 12)) {
+                    const imdbId = await tmdbToImdb(tv.id, 'tv');
+                    if (!imdbId) continue;
+                    items.push({
+                        type: 'series',
+                        name: tv.name,
+                        poster: tv.poster_path ? `https://image.tmdb.org/t/p/w342${tv.poster_path}` : null,
+                        posterShape: 'poster',
+                        deepLinks: {
+                            metaDetailsStreams: `#/detail/series/${imdbId}`,
+                            metaDetailsVideos: `#/detail/series/${imdbId}`
+                        }
+                    });
+                }
+                if (!cancelled) setTmdbItems(items);
+            } catch {
+                if (!cancelled) setTmdbItems([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [query]);
     React.useLayoutEffect(() => {
         onVisibleRangeChange();
     }, [search.catalogs, onVisibleRangeChange]);
@@ -84,7 +156,24 @@ const Search = ({ queryParams }) => {
                                 <div className={styles['message-label']}>{ t.string('STREMIO_TV_SEARCH_NO_ADDONS') }</div>
                             </div>
                             :
-                            search.catalogs.map((catalog, index) => {
+                            <>
+                                {tmdbItems.length > 0 && (
+                                    <div className={classnames(styles['search-row'], styles['search-row-poster'], 'animation-fade-in')}>
+                                        {tmdbItems.map((item, idx) => (
+                                            <MetaItem
+                                                key={`tmdb-${idx}`}
+                                                className={classnames({})}
+                                                type={item.type}
+                                                name={item.name}
+                                                poster={item.poster}
+                                                posterShape={item.posterShape}
+                                                playname={false}
+                                                deepLinks={item.deepLinks}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                                {search.catalogs.map((catalog, index) => {
                                 switch (catalog.content?.type) {
                                     case 'Ready': {
                                         return (
