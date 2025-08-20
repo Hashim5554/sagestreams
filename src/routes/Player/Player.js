@@ -68,7 +68,7 @@ const Player = ({ urlParams, queryParams }) => {
     const errorRef = React.useRef();
 
     const [immersed, setImmersed] = React.useState(true);
-    const setImmersedDebounced = React.useCallback(debounce(setImmersed, 7000), []);
+    const setImmersedDebounced = React.useCallback(debounce(setImmersed, 2000), []);
     const [, , , toggleFullscreen] = useFullscreen();
 
     const [optionsMenuOpen, , closeOptionsMenu, toggleOptionsMenu] = useBinaryState(false);
@@ -354,8 +354,8 @@ const Player = ({ urlParams, queryParams }) => {
         setImmersed(true);
     }, []);
 
-    const onBarMouseMove = React.useCallback((event) => {
-        event.nativeEvent.immersePrevented = true;
+    const onBarMouseMove = React.useCallback(() => {
+        // Do not prevent immersion; allow auto-hide even if the last movement was over controls
     }, []);
 
     onFileDrop(CONSTANTS.SUPPORTED_LOCAL_SUBTITLES, async (filename, buffer) => {
