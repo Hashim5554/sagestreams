@@ -42,11 +42,14 @@ type StreamedSport = {
     name: string;
 };
 
+import { getAdGuardConfig, AdGuardDNSConfig } from '../../common/adGuardAPI';
+
 const API_BASE = 'https://streamed.pk';
 const CACHE_TTL_MS = 60_000;
 
 const storageKey = 'streamed_matches_cache_v1';
 
+// Streamed API functions
 function readCache(): { at: number; data: StreamedMatch[] } | null {
     try {
         const raw = localStorage.getItem(storageKey);
@@ -125,10 +128,18 @@ function formatTime(ts?: number): string {
 }
 
 function isLive(now: number, match: StreamedMatch): boolean {
-    // Consider matches as live if they're within 3 hours of start time
+    // More accurate live detection: consider matches as live only if they started recently (within 30 minutes)
+    // and haven't ended (within 2 hours of start time)
     const startTime = match.date;
-    const endTime = startTime + (3 * 60 * 60 * 1000); // 3 hours after start
-    return now >= startTime && now <= endTime;
+    const currentTime = now;
+    
+    // Match is live if it started within the last 30 minutes and hasn't ended
+    const startedRecently = currentTime >= startTime && currentTime <= startTime + (30 * 60 * 1000);
+    
+    // Match is live if it's currently running (within 2 hours of start)
+    const isCurrentlyRunning = currentTime >= startTime && currentTime <= startTime + (2 * 60 * 60 * 1000);
+    
+    return startedRecently || isCurrentlyRunning;
 }
 
 function isUpcoming(now: number, match: StreamedMatch): boolean {
@@ -137,7 +148,7 @@ function isUpcoming(now: number, match: StreamedMatch): boolean {
 
 function getTimeRemaining(now: number, match: StreamedMatch): string {
     const startTime = match.date;
-    const endTime = startTime + (3 * 60 * 60 * 1000); // 3 hours after start
+    const endTime = startTime + (2 * 60 * 60 * 1000); // 2 hours after start
     
     if (now < startTime) {
         // Upcoming match
@@ -181,8 +192,16 @@ const Sports: React.FC = () => {
     const [selectedStreams, setSelectedStreams] = useState<StreamedStream[] | null>(null);
     const [streamsLoading, setStreamsLoading] = useState<boolean>(false);
     const [selectedStream, setSelectedStream] = useState<StreamedStream | null>(null);
+    const [selectedSource, setSelectedSource] = useState<string>('');
     const [iframeLoading, setIframeLoading] = useState<boolean>(false);
+    const [adGuardConfig, setAdGuardConfig] = useState<AdGuardDNSConfig | null>(null);
     const intervalRef = useRef<number | null>(null);
+
+    // Load AdGuard config on component mount
+    useEffect(() => {
+        const config = getAdGuardConfig();
+        setAdGuardConfig(config);
+    }, []);
 
     const load = useCallback(async (force = false) => {
         setError(null);
@@ -218,11 +237,33 @@ const Sports: React.FC = () => {
         setStreamsLoading(true);
         setSelectedStreams(null);
         setSelectedStream(null);
+        setSelectedSource('');
         
         // Try to get streams for the first available source
         if (match.sources && match.sources.length > 0) {
             const source = match.sources[0];
+            setSelectedSource(source.source);
             const streams = await fetchStreams(source.source, source.id);
+            setSelectedStreams(streams);
+            
+            if (streams && streams.length > 0) {
+                setSelectedStream(streams[0]);
+                setIframeLoading(true);
+            }
+        }
+        setStreamsLoading(false);
+    };
+
+    const handleSourceChange = async (source: string) => {
+        if (!selectedMatch) return;
+        
+        setStreamsLoading(true);
+        setSelectedSource(source);
+        
+        // Find the source object
+        const sourceObj = selectedMatch.sources.find(s => s.source === source);
+        if (sourceObj) {
+            const streams = await fetchStreams(sourceObj.source, sourceObj.id);
             setSelectedStreams(streams);
             
             if (streams && streams.length > 0) {
@@ -246,6 +287,7 @@ const Sports: React.FC = () => {
         setSelectedMatch(null);
         setSelectedStreams(null);
         setSelectedStream(null);
+        setSelectedSource('');
         setIframeLoading(false);
         setStreamsLoading(false);
     };
@@ -382,6 +424,27 @@ const Sports: React.FC = () => {
                             </div>
                         ) : selectedStreams && selectedStreams.length > 0 ? (
                             <div className={styles['stream-container']}>
+                                {/* Source Selector */}
+                                {selectedMatch.sources && selectedMatch.sources.length > 1 && (
+                                    <div className={styles['source-selector']}>
+                                        <h3>Select Source:</h3>
+                                        <div className={styles['source-options']}>
+                                            {selectedMatch.sources.map((source) => (
+                                                <Button
+                                                    key={source.source}
+                                                    className={classnames(styles['source-option'], {
+                                                        [styles['source-option-active']]: selectedSource === source.source
+                                                    })}
+                                                    onClick={() => handleSourceChange(source.source)}
+                                                >
+                                                    {source.source.toUpperCase()}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Stream Selector */}
                                 {selectedStreams.length > 1 && (
                                     <div className={styles['stream-selector']}>
                                         <h3>Select Stream:</h3>
