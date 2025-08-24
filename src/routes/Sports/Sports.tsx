@@ -48,11 +48,12 @@ const API_BASE = 'https://streamed.pk';
 const CACHE_TTL_MS = 60_000;
 
 const storageKey = 'streamed_matches_cache_v1';
+const sportsStorageKey = 'streamed_sports_cache_v1';
 
 // Streamed API functions
-function readCache(): { at: number; data: StreamedMatch[] } | null {
+function readCache(key: string): { at: number; data: any } | null {
     try {
-        const raw = localStorage.getItem(storageKey);
+        const raw = localStorage.getItem(key);
         if (!raw) return null;
         return JSON.parse(raw);
     } catch {
@@ -60,14 +61,53 @@ function readCache(): { at: number; data: StreamedMatch[] } | null {
     }
 }
 
-function writeCache(data: StreamedMatch[]): void {
+function writeCache(key: string, data: any): void {
     try {
-        localStorage.setItem(storageKey, JSON.stringify({ at: Date.now(), data }));
+        localStorage.setItem(key, JSON.stringify({ at: Date.now(), data }));
     } catch {}
 }
 
-async function fetchMatches(force = false): Promise<StreamedMatch[] | null> {
-    const cached = readCache();
+async function fetchSports(force = false): Promise<StreamedSport[] | null> {
+    const cached = readCache(sportsStorageKey);
+    if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+        return cached.data;
+    }
+    try {
+        const res = await fetch(`${API_BASE}/api/sports`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as StreamedSport[];
+        if (json && Array.isArray(json)) {
+            writeCache(sportsStorageKey, json);
+            return json;
+        }
+        return json;
+    } catch (e) {
+        return cached?.data ?? null;
+    }
+}
+
+async function fetchMatchesBySport(sportId: string, force = false): Promise<StreamedMatch[] | null> {
+    const cacheKey = `streamed_matches_${sportId}_v1`;
+    const cached = readCache(cacheKey);
+    if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+        return cached.data;
+    }
+    try {
+        const res = await fetch(`${API_BASE}/api/matches/${sportId}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as StreamedMatch[];
+        if (json && Array.isArray(json)) {
+            writeCache(cacheKey, json);
+            return json;
+        }
+        return json;
+    } catch (e) {
+        return cached?.data ?? null;
+    }
+}
+
+async function fetchLiveMatches(force = false): Promise<StreamedMatch[] | null> {
+    const cached = readCache(storageKey);
     if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
         return cached.data;
     }
@@ -76,32 +116,11 @@ async function fetchMatches(force = false): Promise<StreamedMatch[] | null> {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as StreamedMatch[];
         if (json && Array.isArray(json)) {
-            writeCache(json);
+            writeCache(storageKey, json);
             return json;
         }
         return json;
     } catch (e) {
-        // fallback to stale cache
-        return cached?.data ?? null;
-    }
-}
-
-async function fetchAllMatches(force = false): Promise<StreamedMatch[] | null> {
-    const cached = readCache();
-    if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
-        return cached.data;
-    }
-    try {
-        const res = await fetch(`${API_BASE}/api/matches/all`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as StreamedMatch[];
-        if (json && Array.isArray(json)) {
-            writeCache(json);
-            return json;
-        }
-        return json;
-    } catch (e) {
-        // fallback to stale cache
         return cached?.data ?? null;
     }
 }
@@ -128,18 +147,12 @@ function formatTime(ts?: number): string {
 }
 
 function isLive(now: number, match: StreamedMatch): boolean {
-    // More accurate live detection: consider matches as live only if they started recently (within 30 minutes)
-    // and haven't ended (within 2 hours of start time)
+    // A match is live if it started within the last 2 hours and hasn't ended
     const startTime = match.date;
     const currentTime = now;
     
-    // Match is live if it started within the last 30 minutes and hasn't ended
-    const startedRecently = currentTime >= startTime && currentTime <= startTime + (30 * 60 * 1000);
-    
-    // Match is live if it's currently running (within 2 hours of start)
-    const isCurrentlyRunning = currentTime >= startTime && currentTime <= startTime + (2 * 60 * 60 * 1000);
-    
-    return startedRecently || isCurrentlyRunning;
+    // Match is live if it started within the last 2 hours
+    return currentTime >= startTime && currentTime <= startTime + (2 * 60 * 60 * 1000);
 }
 
 function isUpcoming(now: number, match: StreamedMatch): boolean {
@@ -148,29 +161,34 @@ function isUpcoming(now: number, match: StreamedMatch): boolean {
 
 function getTimeRemaining(now: number, match: StreamedMatch): string {
     const startTime = match.date;
-    const endTime = startTime + (2 * 60 * 60 * 1000); // 2 hours after start
+    const currentTime = now;
     
-    if (now < startTime) {
+    if (currentTime < startTime) {
         // Upcoming match
-        const remaining = startTime - now;
+        const remaining = startTime - currentTime;
         const hours = Math.floor(remaining / (1000 * 60 * 60));
         const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
         
         if (hours > 0) {
             return `Starts in ${hours}h ${minutes}m`;
-        } else {
+        } else if (minutes > 0) {
             return `Starts in ${minutes}m`;
+        } else {
+            return 'Starting now';
         }
-    } else if (now >= startTime && now <= endTime) {
+    } else if (isLive(currentTime, match)) {
         // Live match
-        const remaining = endTime - now;
+        const endTime = startTime + (2 * 60 * 60 * 1000); // 2 hours after start
+        const remaining = endTime - currentTime;
         const hours = Math.floor(remaining / (1000 * 60 * 60));
         const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
         
         if (hours > 0) {
             return `${hours}h ${minutes}m left`;
-        } else {
+        } else if (minutes > 0) {
             return `${minutes}m left`;
+        } else {
+            return 'Ending soon';
         }
     }
     return 'Ended';
@@ -185,6 +203,8 @@ function getPosterUrl(poster: string): string {
 }
 
 const Sports: React.FC = () => {
+    const [sports, setSports] = useState<StreamedSport[] | null>(null);
+    const [selectedSport, setSelectedSport] = useState<string>('all');
     const [matches, setMatches] = useState<StreamedMatch[] | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -203,15 +223,33 @@ const Sports: React.FC = () => {
         setAdGuardConfig(config);
     }, []);
 
+    // Load sports on component mount
+    useEffect(() => {
+        const loadSports = async () => {
+            const sportsData = await fetchSports();
+            setSports(sportsData);
+        };
+        loadSports();
+    }, []);
+
     const load = useCallback(async (force = false) => {
         setError(null);
-        const res = await fetchMatches(force);
+        setLoading(true);
+        
+        let res: StreamedMatch[] | null = null;
+        
+        if (selectedSport === 'all') {
+            res = await fetchLiveMatches(force);
+        } else {
+            res = await fetchMatchesBySport(selectedSport, force);
+        }
+        
         if (res === null) {
             setError('Failed to load matches');
         }
         setMatches(res);
         setLoading(false);
-    }, []);
+    }, [selectedSport]);
 
     useEffect(() => {
         load(false);
@@ -231,6 +269,26 @@ const Sports: React.FC = () => {
     const upcomingMatches = useMemo(() => {
         return allMatches.filter(match => isUpcoming(now, match));
     }, [allMatches, now]);
+
+    const handleSportChange = async (sportId: string) => {
+        setSelectedSport(sportId);
+        setLoading(true);
+        setError(null);
+        
+        let res: StreamedMatch[] | null = null;
+        
+        if (sportId === 'all') {
+            res = await fetchLiveMatches(true);
+        } else {
+            res = await fetchMatchesBySport(sportId, true);
+        }
+        
+        if (res === null) {
+            setError('Failed to load matches');
+        }
+        setMatches(res);
+        setLoading(false);
+    };
 
     const handleWatchClick = async (match: StreamedMatch) => {
         setSelectedMatch(match);
@@ -359,10 +417,38 @@ const Sports: React.FC = () => {
     return (
         <MainNavBars className={styles['sports-container']} route={'sports'} title={'SageStreams'}>
             <div className={classnames(styles['sports-content'], 'animation-fade-in')}>
+                {/* Sports Navigation */}
+                {sports && (
+                    <div className={styles['sports-navigation']}>
+                        <div className={styles['sports-tabs']}>
+                            <Button
+                                className={classnames(styles['sport-tab'], {
+                                    [styles['sport-tab-active']]: selectedSport === 'all'
+                                })}
+                                onClick={() => handleSportChange('all')}
+                            >
+                                🏆 All Sports
+                            </Button>
+                            {sports.map((sport) => (
+                                <Button
+                                    key={sport.id}
+                                    className={classnames(styles['sport-tab'], {
+                                        [styles['sport-tab-active']]: selectedSport === sport.id
+                                    })}
+                                    onClick={() => handleSportChange(sport.id)}
+                                >
+                                    {sport.name}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Content */}
                 {loading ? (
                     <div className={styles['message']}>
                         <div className={styles['loading-spinner']}></div>
-                        <div>Loading live sports…</div>
+                        <div>Loading {selectedSport === 'all' ? 'live sports' : `${sports?.find(s => s.id === selectedSport)?.name || 'sports'} matches`}…</div>
                     </div>
                 ) : error ? (
                     <div className={styles['message']}>
@@ -372,13 +458,16 @@ const Sports: React.FC = () => {
                 ) : !matches || allMatches.length === 0 ? (
                     <div className={styles['message']}>
                         <div className={styles['empty-icon']}>🏟️</div>
-                        <div>No matches available right now.</div>
+                        <div>No matches available for {selectedSport === 'all' ? 'live sports' : `${sports?.find(s => s.id === selectedSport)?.name || 'this sport'}`}</div>
                     </div>
                 ) : (
                     <>
                         {liveMatches.length > 0 && (
                             <section className={styles['section']}>
-                                <h2 className={styles['section-title']}>Live Now</h2>
+                                <h2 className={styles['section-title']}>
+                                    <span className={styles['live-indicator']}>🔴</span>
+                                    Live Now ({liveMatches.length})
+                                </h2>
                                 <div className={styles['grid']}>
                                     {liveMatches.map((match) => renderMatchCard(match, true))}
                                 </div>
@@ -387,9 +476,24 @@ const Sports: React.FC = () => {
 
                         {upcomingMatches.length > 0 && (
                             <section className={styles['section']}>
-                                <h2 className={styles['section-title']}>Upcoming</h2>
+                                <h2 className={styles['section-title']}>
+                                    <span className={styles['upcoming-indicator']}>⏰</span>
+                                    Upcoming ({upcomingMatches.length})
+                                </h2>
                                 <div className={styles['grid']}>
                                     {upcomingMatches.map((match) => renderMatchCard(match, false, true))}
+                                </div>
+                            </section>
+                        )}
+
+                        {liveMatches.length === 0 && upcomingMatches.length === 0 && allMatches.length > 0 && (
+                            <section className={styles['section']}>
+                                <h2 className={styles['section-title']}>
+                                    <span className={styles['ended-indicator']}>🏁</span>
+                                    Recent Matches
+                                </h2>
+                                <div className={styles['grid']}>
+                                    {allMatches.slice(0, 12).map((match) => renderMatchCard(match))}
                                 </div>
                             </section>
                         )}
