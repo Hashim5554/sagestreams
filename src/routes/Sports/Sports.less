@@ -394,6 +394,55 @@
     font-size: 0.9rem;
 }
 
+.card-teams {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin: 0.5rem 0;
+}
+
+.team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: center;
+}
+
+.team-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.team:hover .team-badge {
+    border-color: rgba(0, 212, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.team-name {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vs {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 /* Modal Styles - Massively Improved */
 .modal {
     width: min(99.5vw, 2000px);
@@ -491,6 +540,107 @@
 .stream-container {
     position: relative;
     min-height: 400px;
+}
+
+.stream-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    padding: 3rem;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+    margin: 2rem;
+}
+
+.stream-selector {
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    margin: 0 2rem 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(15px);
+}
+
+.stream-selector h3 {
+    color: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin: 0 0 1rem;
+    opacity: 0.9;
+}
+
+.stream-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.stream-option {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.stream-option:hover {
+    background: rgba(0, 212, 255, 0.15);
+    border-color: rgba(0, 212, 255, 0.4);
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.stream-option-active {
+    background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+    border-color: rgba(0, 212, 255, 0.5);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+}
+
+.stream-details {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    font-size: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-label {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    min-width: 80px;
+}
+
+.detail-value {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.match-details {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .iframe-loading {
