@@ -333,55 +333,27 @@ const Sports: React.FC = () => {
     const now = Date.now();
     const allMatches = useMemo(() => matches ?? [], [matches]);
 
-    // Get distinct competitions from data (by category)
-    const competitions = useMemo(() => {
-        const set = new Set<string>();
-        for (const m of allMatches) {
-            const cat = (m.category || '').trim();
-            if (cat) set.add(cat);
-        }
-        return Array.from(set).sort((a, b) => a.localeCompare(b));
-    }, [allMatches]);
-
-    // Initialize or reset selected competition on data change
-    useEffect(() => {
-        if (competitions.length > 0) {
-            // Keep current selection if still present, else pick first
-            setSelectedCompetition((prev) => (prev && competitions.includes(prev) ? prev : competitions[0]));
-        } else {
-            setSelectedCompetition('');
-        }
-    }, [competitions]);
-
     const liveMatches = useMemo(() => allMatches.filter((m) => isLive(now, m)), [allMatches, now]);
 
-    // Upcoming filtered to the selected competition only
-    const upcomingMatches = useMemo(() => {
-        return allMatches.filter((m) => isUpcoming(now, m) && ((m.category || '').trim() === (selectedCompetition || '').trim()));
-    }, [allMatches, now, selectedCompetition]);
+    // Resolved competition name helper
+    const getResolvedCompetition = useCallback((m: StreamedMatch): string => {
+        return (competitionByMatch[m.id] || m.category || 'Other').trim();
+    }, [competitionByMatch]);
 
-    // Upcoming: single block list, sorted by (competition priority, time)
-    const upcomingSorted = useMemo(() => {
-        return [...upcomingMatches].sort((a, b) => {
-            const nameA = a.category || '';
-            const nameB = b.category || '';
-            // Primary sort: competition name alphabetical
-            if (nameA !== nameB) return nameA.localeCompare(nameB);
-            // Secondary sort: time
-            return a.date - b.date;
-        });
-    }, [upcomingMatches]);
-
-    // Compute separators when competition changes
-    const upcomingWithSeparators = useMemo(() => {
-        let prevCat: string | null = null;
-        return upcomingSorted.map((m) => {
-            const cat = (m.category || '').trim();
-            const showSep = prevCat !== null && prevCat !== cat;
-            prevCat = cat;
-            return { match: m, showSep };
-        });
-    }, [upcomingSorted]);
+    // Upcoming grouped by resolved competition
+    const upcomingByCompetition = useMemo(() => {
+        const groups: Record<string, StreamedMatch[]> = {};
+        for (const m of allMatches) {
+            if (!isUpcoming(now, m)) continue;
+            const comp = getResolvedCompetition(m);
+            if (!groups[comp]) groups[comp] = [];
+            groups[comp].push(m);
+        }
+        // sort matches by time within group
+        Object.keys(groups).forEach((k) => groups[k].sort((a, b) => a.date - b.date));
+        // sort competitions alphabetically (could be changed to priority later)
+        return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map((key) => ({ key, items: groups[key] }));
+    }, [allMatches, now, getResolvedCompetition]);
 
     const handleSportChange = async (sportId: string) => {
         if (sportId === selectedSport) return;
@@ -532,28 +504,6 @@ const Sports: React.FC = () => {
                     </div>
                 )}
 
-                {/* NEW: competition selector */}
-                {competitions.length > 0 && (
-                    <div className={styles['competition-bar']}>
-                        <div className={styles['competition-left']}>
-                            <LeagueBadge name={selectedCompetition} />
-                        </div>
-                        <div className={styles['competition-tabs']}>
-                            {competitions.map((comp) => (
-                                <button
-                                    key={comp}
-                                    className={classnames(styles['comp-tab'], {
-                                        [styles['comp-tab-active']]: comp === selectedCompetition
-                                    })}
-                                    onClick={() => setSelectedCompetition(comp)}
-                                >
-                                    {comp}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {loading ? (
                     <div className={styles['message']}>
                         <div className={styles['loading-spinner']}></div>
@@ -571,6 +521,7 @@ const Sports: React.FC = () => {
                     </div>
                 ) : (
                     <>
+                        {/* Live Now unchanged layout, but competition shows inside card subtitle */}
                         {liveMatches.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
@@ -583,36 +534,23 @@ const Sports: React.FC = () => {
                             </section>
                         )}
 
-                        {upcomingSorted.length > 0 && (
-                            <section className={styles['section']}>
-                                <h2 className={styles['section-title']}>
-                                    <span className={styles['upcoming-indicator']}>⏰</span>
-                                    Upcoming — <span className={styles['inline-league']}><LeagueBadge name={selectedCompetition} /></span>
-                                </h2>
-                                <div className={styles['upcoming-list']}>
-                                    {upcomingSorted.map((match, idx) => (
-                                        <div key={match.id} className={styles['upcoming-row']}>
-                                            {idx > 0 && <div className={styles['separator-line']}></div>}
-                                            <div className={styles['upcoming-left']}>
-                                                <div className={styles['comp-mini']}><LeagueBadge name={match.category} /></div>
-                                            </div>
-                                            <div className={styles['upcoming-middle']}>
-                                                <div className={styles['upcoming-title']}>{match.title}</div>
-                                                <div className={styles['upcoming-time']}>{formatTime(match.date)} · {getTimeRemaining(now, match)}</div>
-                                            </div>
-                                            <div className={styles['upcoming-right']}>
-                                                <Button className={styles['watch-button']} onClick={() => handleWatchClick(match)}>
-                                                    <span className={styles['watch-icon']}>▶️</span>
-                                                    Watch
-                                                </Button>
-                                            </div>
+                        {/* Upcoming grouped by competition, sections with badge and title */}
+                        {upcomingByCompetition.length > 0 && (
+                            <>
+                                {upcomingByCompetition.map((group) => (
+                                    <section key={group.key} className={styles['section']}>
+                                        <div className={styles['competition-header']}>
+                                            <LeagueBadge name={group.key} />
                                         </div>
-                                    ))}
-                                </div>
-                            </section>
+                                        <div className={styles['grid']}>
+                                            {group.items.map((m) => renderMatchCard(m, false, true))}
+                                        </div>
+                                    </section>
+                                ))}
+                            </>
                         )}
 
-                        {liveMatches.length === 0 && upcomingSorted.length === 0 && allMatches.length > 0 && (
+                        {liveMatches.length === 0 && upcomingByCompetition.length === 0 && allMatches.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
                                     <span className={styles['ended-indicator']}>🏁</span>
@@ -637,7 +575,7 @@ const Sports: React.FC = () => {
                                 <div className={styles['overlay-title']}>{selectedMatch.title}</div>
                                 {selectedMatch.category && (
                                     <div className={styles['overlay-subtitle']}>
-                                        <LeagueBadge name={selectedMatch.category} />
+                                        <LeagueBadge name={competitionByMatch[selectedMatch.id] || selectedMatch.category} />
                                     </div>
                                 )}
                             </div>
