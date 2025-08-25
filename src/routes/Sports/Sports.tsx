@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classnames from 'classnames';
-import { MainNavBars, Button, Image } from 'stremio/components';
+import { MainNavBars, Button, ModalDialog, Image } from 'stremio/components';
 import styles from './Sports.less';
 
 type StreamedMatch = {
@@ -49,15 +49,16 @@ const CACHE_TTL_MS = 60_000;
 
 const storageKey = 'streamed_matches_cache_v1';
 const sportsStorageKey = 'streamed_sports_cache_v1';
-const LEAGUE_BADGES_KEY = 'league_badges_cache_v1';
-const MATCH_LEAGUE_CACHE_KEY = 'match_league_cache_v1';
 
+// Helpers
 function normalizeUnixTimestamp(ts: number | undefined | null): number | null {
     if (!ts) return null;
+    // If seconds (10 digits), convert to ms
     if (ts < 1e12) return ts * 1000;
     return ts;
 }
 
+// Streamed API functions
 function readCache(key: string): { at: number; data: any } | null {
     try {
         const raw = localStorage.getItem(key);
@@ -119,6 +120,31 @@ async function fetchMatchesBySport(sportId: string, force = false): Promise<Stre
     }
 }
 
+async function fetchLiveMatches(force = false): Promise<StreamedMatch[] | null> {
+    const cached = readCache(storageKey);
+    if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+        return cached.data;
+    }
+    try {
+        const res = await fetch(`${API_BASE}/api/matches/live`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as StreamedMatch[];
+        const normalized = Array.isArray(json)
+            ? json.map((m) => ({
+                ...m,
+                date: normalizeUnixTimestamp(m.date) || 0
+            }))
+            : json;
+        if (normalized && Array.isArray(normalized)) {
+            writeCache(storageKey, normalized);
+            return normalized;
+        }
+        return normalized as any;
+    } catch (e) {
+        return cached?.data ?? null;
+    }
+}
+
 async function fetchStreams(source: string, id: string): Promise<StreamedStream[] | null> {
     try {
         const res = await fetch(`${API_BASE}/api/stream/${source}/${id}`, { cache: 'no-store' });
@@ -141,6 +167,7 @@ function formatTime(ts?: number): string {
 }
 
 function isLive(now: number, match: StreamedMatch): boolean {
+    // Live if started within last 2 hours
     const startTime = match.date;
     const currentTime = now;
     return startTime > 0 && currentTime >= startTime && currentTime <= startTime + (2 * 60 * 60 * 1000);
@@ -181,68 +208,6 @@ function getPosterUrl(poster: string): string {
     return `${API_BASE}${poster}.webp`;
 }
 
-// TheSportsDB league badge resolver with caching
-async function fetchLeagueBadge(leagueName: string): Promise<string | null> {
-    if (!leagueName) return null;
-    const cache = readCache(LEAGUE_BADGES_KEY) || { at: 0, data: {} };
-    const cachedUrl = cache.data[leagueName];
-    if (cachedUrl) return cachedUrl as string;
-
-    try {
-        const url = `https://www.thesportsdb.com/api/v1/json/1/searchleagues.php?l=${encodeURIComponent(leagueName)}`;
-        const res = await fetch(url, { cache: 'force-cache' });
-        if (!res.ok) throw new Error('Badge fetch failed');
-        const json = await res.json();
-        const league = json?.leagues && Array.isArray(json.leagues) ? json.leagues[0] : null;
-        const badge = league?.strBadge || league?.strLogo || league?.strTrophy || null;
-        if (badge) {
-            const newData = { ...(cache.data || {}), [leagueName]: badge };
-            writeCache(LEAGUE_BADGES_KEY, newData);
-            return badge as string;
-        }
-    } catch {}
-    return null;
-}
-
-// Resolve competition via TheSportsDB by team name
-async function resolveCompetitionByTeam(teamName: string): Promise<string | null> {
-    try {
-        const url = `https://www.thesportsdb.com/api/v1/json/1/searchteams.php?t=${encodeURIComponent(teamName)}`;
-        const res = await fetch(url, { cache: 'force-cache' });
-        if (!res.ok) throw new Error('Team fetch failed');
-        const json = await res.json();
-        const team = json?.teams && Array.isArray(json.teams) ? json.teams[0] : null;
-        const league: string | null = team?.strLeague || team?.strLeague2 || team?.strLeague3 || null;
-        return league && typeof league === 'string' ? league : null;
-    } catch {
-        return null;
-    }
-}
-
-const LeagueBadge: React.FC<{ name?: string }> = ({ name }) => {
-    const [badgeUrl, setBadgeUrl] = useState<string | null>(null);
-    useEffect(() => {
-        let ignore = false;
-        (async () => {
-            if (!name) return;
-            const url = await fetchLeagueBadge(name);
-            if (!ignore) setBadgeUrl(url);
-        })();
-        return () => { ignore = true; };
-    }, [name]);
-    if (!name) return null;
-    return (
-        <div className={styles['comp-badge-wrap']}>
-            {badgeUrl ? (
-                <img className={styles['comp-badge']} src={badgeUrl} alt={name} />
-            ) : (
-                <span className={styles['comp-badge-fallback']}>🏟️</span>
-            )}
-            <span className={styles['comp-name']}>{name}</span>
-        </div>
-    );
-};
-
 const Sports: React.FC = () => {
     const [sports, setSports] = useState<StreamedSport[] | null>(null);
     const [selectedSport, setSelectedSport] = useState<string>('');
@@ -258,18 +223,13 @@ const Sports: React.FC = () => {
     const [adGuardConfig, setAdGuardConfig] = useState<AdGuardDNSConfig | null>(null);
     const intervalRef = useRef<number | null>(null);
 
-    // NEW: competition selection
-    const [selectedCompetition, setSelectedCompetition] = useState<string>('');
-    const [competitionByMatch, setCompetitionByMatch] = useState<Record<string, string>>(() => {
-        const cached = readCache(MATCH_LEAGUE_CACHE_KEY);
-        return (cached?.data as Record<string, string>) || {};
-    });
-
+    // Load AdGuard config
     useEffect(() => {
         const config = getAdGuardConfig();
         setAdGuardConfig(config);
     }, []);
 
+    // Load sports and set default sport
     useEffect(() => {
         const loadSports = async () => {
             const sportsData = await fetchSports();
@@ -302,58 +262,11 @@ const Sports: React.FC = () => {
         };
     }, [load]);
 
-    // Resolve competitions for visible matches and cache results
-    useEffect(() => {
-        const unresolved = (matches || []).filter((m) => !competitionByMatch[m.id]);
-        if (unresolved.length === 0) return;
-        let cancelled = false;
-        (async () => {
-            const updates: Record<string, string> = {};
-            for (const m of unresolved) {
-                const teamName = m.teams?.home?.name || m.teams?.away?.name || '';
-                const fromTitle = !teamName && m.title ? m.title.split(/vs|VS|v\.|-/)[0]?.trim() : '';
-                const query = teamName || fromTitle;
-                if (!query) continue;
-                const league = await resolveCompetitionByTeam(query);
-                if (league) {
-                    updates[m.id] = league;
-                }
-            }
-            if (!cancelled && Object.keys(updates).length > 0) {
-                setCompetitionByMatch((prev) => {
-                    const next = { ...prev, ...updates };
-                    writeCache(MATCH_LEAGUE_CACHE_KEY, next);
-                    return next;
-                });
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [matches]);
-
     const now = Date.now();
     const allMatches = useMemo(() => matches ?? [], [matches]);
 
     const liveMatches = useMemo(() => allMatches.filter((m) => isLive(now, m)), [allMatches, now]);
-
-    // Resolved competition name helper
-    const getResolvedCompetition = useCallback((m: StreamedMatch): string => {
-        return (competitionByMatch[m.id] || m.category || 'Other').trim();
-    }, [competitionByMatch]);
-
-    // Upcoming grouped by resolved competition
-    const upcomingByCompetition = useMemo(() => {
-        const groups: Record<string, StreamedMatch[]> = {};
-        for (const m of allMatches) {
-            if (!isUpcoming(now, m)) continue;
-            const comp = getResolvedCompetition(m);
-            if (!groups[comp]) groups[comp] = [];
-            groups[comp].push(m);
-        }
-        // sort matches by time within group
-        Object.keys(groups).forEach((k) => groups[k].sort((a, b) => a.date - b.date));
-        // sort competitions alphabetically (could be changed to priority later)
-        return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map((key) => ({ key, items: groups[key] }));
-    }, [allMatches, now, getResolvedCompetition]);
+    const upcomingMatches = useMemo(() => allMatches.filter((m) => isUpcoming(now, m)), [allMatches, now]);
 
     const handleSportChange = async (sportId: string) => {
         if (sportId === selectedSport) return;
@@ -411,81 +324,74 @@ const Sports: React.FC = () => {
         setStreamsLoading(false);
     };
 
-    const renderMatchCard = (match: StreamedMatch, isLiveMatch: boolean = false, isUpcomingMatch: boolean = false) => {
-        const compName = competitionByMatch[match.id] || match.category;
-        return (
-            <div key={match.id} className={styles['card']}>
-                <div className={styles['poster']}>
-                    {match.poster ? (
-                        <img
-                            className={styles['poster-img']}
-                            src={getPosterUrl(match.poster)}
-                            alt={match.title}
-                            onError={(e) => {
-                                const target = e.currentTarget as HTMLImageElement;
-                                target.style.display = 'none';
-                                const fallback = target.parentElement?.querySelector('.poster-fallback') as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                            }}
-                        />
-                    ) : (
-                        <div className={styles['poster-fallback']} />
-                    )}
-                    {isLiveMatch && <div className={styles['badge-live']}>LIVE</div>}
-                    {isUpcomingMatch && <div className={styles['badge-upcoming']}>SOON</div>}
-                    <div className={styles['time-remaining']}>{getTimeRemaining(now, match)}</div>
-                </div>
-                <div className={styles['card-body']}>
-                    {isLiveMatch && compName && (
-                        <div className={styles['card-subtitle']}>
-                            <LeagueBadge name={compName} />
-                        </div>
-                    )}
-                    <div className={styles['card-title']}>{match.title}</div>
-                    {match.teams && (
-                        <div className={styles['card-teams']}>
-                            {match.teams.home && (
-                                <div className={styles['team']}>
-                                    <img
-                                        className={styles['team-badge']}
-                                        src={getTeamBadgeUrl(match.teams.home.badge)}
-                                        alt={match.teams.home.name}
-                                        onError={(e) => {
-                                            e.currentTarget.style.display = 'none';
-                                        }}
-                                    />
-                                    <span className={styles['team-name']}>{match.teams.home.name}</span>
-                                </div>
-                            )}
-                            <span className={styles['vs']}>vs</span>
-                            {match.teams.away && (
-                                <div className={styles['team']}>
-                                    <img
-                                        className={styles['team-badge']}
-                                        src={getTeamBadgeUrl(match.teams.away.badge)}
-                                        alt={match.teams.away.name}
-                                        onError={(e) => {
-                                            e.currentTarget.style.display = 'none';
-                                        }}
-                                    />
-                                    <span className={styles['team-name']}>{match.teams.away.name}</span>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    <div className={styles['time']}>{formatTime(match.date)}</div>
-                    <Button className={styles['watch-button']} onClick={() => handleWatchClick(match)}>
-                        <span className={styles['watch-icon']}>▶️</span>
-                        {isLiveMatch ? 'Watch Live' : 'Watch'}
-                    </Button>
-                </div>
+    const renderMatchCard = (match: StreamedMatch, isLiveMatch: boolean = false, isUpcomingMatch: boolean = false) => (
+        <div key={match.id} className={styles['card']}>
+            <div className={styles['poster']}>
+                {match.poster ? (
+                    <img
+                        className={styles['poster-img']}
+                        src={getPosterUrl(match.poster)}
+                        alt={match.title}
+                        onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = 'none';
+                            const fallback = target.parentElement?.querySelector('.poster-fallback') as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                        }}
+                    />
+                ) : (
+                    <div className={styles['poster-fallback']} />
+                )}
+                {isLiveMatch && <div className={styles['badge-live']}>LIVE</div>}
+                {isUpcomingMatch && <div className={styles['badge-upcoming']}>SOON</div>}
+                <div className={styles['time-remaining']}>{getTimeRemaining(now, match)}</div>
             </div>
-        );
-    };
+            <div className={styles['card-body']}>
+                <div className={styles['card-title']}>{match.title}</div>
+                {match.teams && (
+                    <div className={styles['card-teams']}>
+                        {match.teams.home && (
+                            <div className={styles['team']}>
+                                <img
+                                    className={styles['team-badge']}
+                                    src={getTeamBadgeUrl(match.teams.home.badge)}
+                                    alt={match.teams.home.name}
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                                <span className={styles['team-name']}>{match.teams.home.name}</span>
+                            </div>
+                        )}
+                        <span className={styles['vs']}>vs</span>
+                        {match.teams.away && (
+                            <div className={styles['team']}>
+                                <img
+                                    className={styles['team-badge']}
+                                    src={getTeamBadgeUrl(match.teams.away.badge)}
+                                    alt={match.teams.away.name}
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                                <span className={styles['team-name']}>{match.teams.away.name}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+                <div className={styles['time']}>{formatTime(match.date)}</div>
+                <Button className={styles['watch-button']} onClick={() => handleWatchClick(match)}>
+                    <span className={styles['watch-icon']}>▶️</span>
+                    {isLiveMatch ? 'Watch Live' : 'Watch'}
+                </Button>
+            </div>
+        </div>
+    );
 
     return (
         <MainNavBars className={styles['sports-container']} route={'sports'} title={'SageStreams'}>
             <div className={classnames(styles['sports-content'], 'animation-fade-in')}>
+                {/* Sports Navigation (no All Sports) */}
                 {sports && sports.length > 0 && (
                     <div className={styles['sports-navigation']}>
                         <div className={styles['sports-tabs']}>
@@ -504,6 +410,7 @@ const Sports: React.FC = () => {
                     </div>
                 )}
 
+                {/* Content */}
                 {loading ? (
                     <div className={styles['message']}>
                         <div className={styles['loading-spinner']}></div>
@@ -521,7 +428,6 @@ const Sports: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        {/* Live Now unchanged layout, but competition shows inside card subtitle */}
                         {liveMatches.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
@@ -534,23 +440,19 @@ const Sports: React.FC = () => {
                             </section>
                         )}
 
-                        {/* Upcoming grouped by competition, sections with badge and title */}
-                        {upcomingByCompetition.length > 0 && (
-                            <>
-                                {upcomingByCompetition.map((group) => (
-                                    <section key={group.key} className={styles['section']}>
-                                        <div className={styles['competition-header']}>
-                                            <LeagueBadge name={group.key} />
-                                        </div>
-                                        <div className={styles['grid']}>
-                                            {group.items.map((m) => renderMatchCard(m, false, true))}
-                                        </div>
-                                    </section>
-                                ))}
-                            </>
+                        {upcomingMatches.length > 0 && (
+                            <section className={styles['section']}>
+                                <h2 className={styles['section-title']}>
+                                    <span className={styles['upcoming-indicator']}>⏰</span>
+                                    Upcoming ({upcomingMatches.length})
+                                </h2>
+                                <div className={styles['grid']}>
+                                    {upcomingMatches.map((match) => renderMatchCard(match, false, true))}
+                                </div>
+                            </section>
                         )}
 
-                        {liveMatches.length === 0 && upcomingByCompetition.length === 0 && allMatches.length > 0 && (
+                        {liveMatches.length === 0 && upcomingMatches.length === 0 && allMatches.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
                                     <span className={styles['ended-indicator']}>🏁</span>
@@ -565,7 +467,6 @@ const Sports: React.FC = () => {
                 )}
             </div>
 
-            {/* Custom modal overlay remains */}
             {selectedMatch && (
                 <div className={styles['overlay']} role="dialog" aria-modal="true">
                     <div className={styles['overlay-backdrop']} onClick={handleCloseModal} />
@@ -574,9 +475,7 @@ const Sports: React.FC = () => {
                             <div className={styles['overlay-title-wrap']}>
                                 <div className={styles['overlay-title']}>{selectedMatch.title}</div>
                                 {selectedMatch.category && (
-                                    <div className={styles['overlay-subtitle']}>
-                                        <LeagueBadge name={competitionByMatch[selectedMatch.id] || selectedMatch.category} />
-                                    </div>
+                                    <div className={styles['overlay-subtitle']}>{selectedMatch.category}</div>
                                 )}
                             </div>
                             <button className={styles['overlay-close']} onClick={handleCloseModal} aria-label="Close">✕</button>
@@ -597,7 +496,6 @@ const Sports: React.FC = () => {
                                     ))}
                                 </div>
                             )}
-
                             {streamsLoading ? (
                                 <div className={styles['overlay-loading']}>
                                     <div className={styles['loading-spinner']} />
@@ -620,7 +518,6 @@ const Sports: React.FC = () => {
                                             ))}
                                         </div>
                                     )}
-
                                     <div className={styles['overlay-player']}>
                                         {iframeLoading && (
                                             <div className={styles['overlay-player-loading']}>
