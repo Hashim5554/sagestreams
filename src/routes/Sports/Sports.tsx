@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classnames from 'classnames';
-import { MainNavBars, Button, ModalDialog, Image } from 'stremio/components';
+import { MainNavBars, Button, Image } from 'stremio/components';
 import styles from './Sports.less';
 
 type StreamedMatch = {
@@ -117,31 +117,6 @@ async function fetchMatchesBySport(sportId: string, force = false): Promise<Stre
     }
 }
 
-async function fetchLiveMatches(force = false): Promise<StreamedMatch[] | null> {
-    const cached = readCache(storageKey);
-    if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
-        return cached.data;
-    }
-    try {
-        const res = await fetch(`${API_BASE}/api/matches/live`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as StreamedMatch[];
-        const normalized = Array.isArray(json)
-            ? json.map((m) => ({
-                ...m,
-                date: normalizeUnixTimestamp(m.date) || 0
-            }))
-            : json;
-        if (normalized && Array.isArray(normalized)) {
-            writeCache(storageKey, normalized);
-            return normalized;
-        }
-        return normalized as any;
-    } catch (e) {
-        return cached?.data ?? null;
-    }
-}
-
 async function fetchStreams(source: string, id: string): Promise<StreamedStream[] | null> {
     try {
         const res = await fetch(`${API_BASE}/api/stream/${source}/${id}`, { cache: 'no-store' });
@@ -202,6 +177,47 @@ function getTeamBadgeUrl(badge: string): string {
 
 function getPosterUrl(poster: string): string {
     return `${API_BASE}${poster}.webp`;
+}
+
+// Competition icon resolver (emoji fallback). Could be replaced with free icon API later.
+const COMPETITION_ICON_MAP: Record<string, string> = {
+    'UEFA Champions League': '⭐',
+    'Premier League': '🏴',
+    'La Liga': '🇪🇸',
+    'Serie A': '🇮🇹',
+    'Bundesliga': '🇩🇪',
+    'Ligue 1': '🇫🇷',
+    'NBA': '🏀',
+    'NFL': '🏈',
+    'NHL': '🏒',
+    'MLB': '⚾',
+    'UFC': '🥊',
+};
+
+function getCompetitionIcon(name?: string): string {
+    if (!name) return '🏟️';
+    const key = Object.keys(COMPETITION_ICON_MAP).find((k) => name.toLowerCase().includes(k.toLowerCase()));
+    return key ? COMPETITION_ICON_MAP[key] : '🏟️';
+}
+
+// Competition priority (most important first)
+const COMPETITION_PRIORITY = [
+    'UEFA Champions League',
+    'Premier League',
+    'La Liga',
+    'Serie A',
+    'Bundesliga',
+    'Ligue 1',
+    'NBA',
+    'NFL',
+    'NHL',
+    'MLB',
+    'UFC',
+];
+
+function competitionRank(name: string): number {
+    const idx = COMPETITION_PRIORITY.findIndex((n) => name.toLowerCase().includes(n.toLowerCase()));
+    return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
 }
 
 const Sports: React.FC = () => {
@@ -269,14 +285,17 @@ const Sports: React.FC = () => {
             if (!groups[key]) groups[key] = [];
             groups[key].push(m);
         }
-        // Sort groups alphabetically; within group sort by date
-        const ordered = Object.keys(groups)
-            .sort((a, b) => a.localeCompare(b))
-            .map((k) => ({
-                key: k,
-                items: groups[k].sort((a, b) => a.date - b.date),
-            }));
-        return ordered;
+        const orderedKeys = Object.keys(groups).sort((a, b) => {
+            const rankA = competitionRank(a);
+            const rankB = competitionRank(b);
+            if (rankA !== rankB) return rankA - rankB;
+            return a.localeCompare(b);
+        });
+        return orderedKeys.map((k) => ({
+            key: k,
+            icon: getCompetitionIcon(k),
+            items: groups[k].sort((a, b) => a.date - b.date),
+        }));
     }, [upcomingMatches]);
 
     const handleSportChange = async (sportId: string) => {
@@ -453,13 +472,16 @@ const Sports: React.FC = () => {
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
                                     <span className={styles['upcoming-indicator']}>⏰</span>
-                                    Upcoming by League
+                                    Upcoming
                                 </h2>
                                 <div className={styles['groups']}>
                                     {upcomingByCategory.map((group) => (
                                         <div key={group.key} className={styles['group']}>
                                             <div className={styles['group-header']}>
-                                                <div className={styles['group-title']}>{group.key}</div>
+                                                <div className={styles['group-title']}>
+                                                    <span className={styles['group-icon']}>{group.icon}</span>
+                                                    {group.key}
+                                                </div>
                                                 <div className={styles['group-count']}>{group.items.length}</div>
                                             </div>
                                             <div className={styles['separator-line']}></div>
@@ -487,78 +509,72 @@ const Sports: React.FC = () => {
                 )}
             </div>
 
+            {/* Custom modal overlay (no shared components) */}
             {selectedMatch && (
-                <ModalDialog
-                    className={styles['modal']}
-                    title={
-                        <div className={styles['modal-header']}>
-                            <div className={styles['modal-title-content']}>
-                                <h2 className={styles['modal-title']}>{selectedMatch.title}</h2>
-                                {selectedMatch.category && <div className={styles['modal-subtitle']}>{selectedMatch.category}</div>}
+                <div className={styles['overlay']} role="dialog" aria-modal="true">
+                    <div className={styles['overlay-backdrop']} onClick={handleCloseModal} />
+                    <div className={styles['overlay-dialog']}>
+                        <div className={styles['overlay-header']}>
+                            <div className={styles['overlay-title-wrap']}>
+                                <div className={styles['overlay-title']}>{selectedMatch.title}</div>
+                                {selectedMatch.category && (
+                                    <div className={styles['overlay-subtitle']}>
+                                        {getCompetitionIcon(selectedMatch.category)} {selectedMatch.category}
+                                    </div>
+                                )}
                             </div>
-                            <Button className={styles['close-button']} onClick={handleCloseModal}>✕</Button>
+                            <button className={styles['overlay-close']} onClick={handleCloseModal} aria-label="Close">✕</button>
                         </div>
-                    }
-                    onCloseRequest={handleCloseModal}
-                    buttons={[]}
-                    dataset={{}}
-                    background={false}
-                >
-                    <div className={styles['modal-content']}>
-                        {selectedMatch.sources && selectedMatch.sources.length > 0 && (
-                            <div className={styles['source-selector']}>
-                                <div className={styles['source-options']}>
+                        <div className={styles['overlay-body']}>
+                            {selectedMatch.sources && selectedMatch.sources.length > 0 && (
+                                <div className={styles['overlay-sources']}>
                                     {selectedMatch.sources.map((source) => (
-                                        <Button
+                                        <button
                                             key={source.source}
-                                            className={classnames(styles['source-option'], {
-                                                [styles['source-option-active']]: selectedSource === source.source
+                                            className={classnames(styles['chip'], {
+                                                [styles['chip-active']]: selectedSource === source.source
                                             })}
                                             onClick={() => handleSourceChange(source.source)}
                                         >
                                             {source.source.toUpperCase()}
-                                        </Button>
+                                        </button>
                                     ))}
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {streamsLoading ? (
-                            <div className={styles['stream-loading']}>
-                                <div className={styles['loading-spinner']}></div>
-                                <div>Loading streams…</div>
-                            </div>
-                        ) : selectedStreams && selectedStreams.length > 0 ? (
-                            <div className={styles['stream-container']}>
-                                {selectedStreams.length > 1 && (
-                                    <div className={styles['stream-selector']}>
-                                        <div className={styles['stream-options']}>
+                            {streamsLoading ? (
+                                <div className={styles['overlay-loading']}>
+                                    <div className={styles['loading-spinner']} />
+                                    <div>Loading streams…</div>
+                                </div>
+                            ) : selectedStreams && selectedStreams.length > 0 ? (
+                                <>
+                                    {selectedStreams.length > 1 && (
+                                        <div className={styles['overlay-streams']}>
                                             {selectedStreams.map((stream) => (
-                                                <Button
+                                                <button
                                                     key={stream.id}
-                                                    className={classnames(styles['stream-option'], {
-                                                        [styles['stream-option-active']]: selectedStream?.id === stream.id
+                                                    className={classnames(styles['chip'], {
+                                                        [styles['chip-active']]: selectedStream?.id === stream.id
                                                     })}
                                                     onClick={() => handleStreamSelect(stream)}
                                                 >
                                                     S{stream.streamNo} · {stream.language} · {stream.hd ? 'HD' : 'SD'}
-                                                </Button>
+                                                </button>
                                             ))}
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {selectedStream && (
-                                    <>
+                                    <div className={styles['overlay-player']}>
                                         {iframeLoading && (
-                                            <div className={styles['iframe-loading']}>
-                                                <div className={styles['loading-spinner']}></div>
+                                            <div className={styles['overlay-player-loading']}>
+                                                <div className={styles['loading-spinner']} />
                                                 <div>Loading stream…</div>
                                             </div>
                                         )}
-                                        <div className={styles['iframe-container']}>
+                                        {selectedStream && (
                                             <iframe
-                                                className={styles['iframe']}
+                                                className={styles['overlay-iframe']}
                                                 src={selectedStream.embedUrl}
                                                 title={selectedMatch.title}
                                                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
@@ -566,19 +582,18 @@ const Sports: React.FC = () => {
                                                 onLoad={handleIframeLoad}
                                                 style={{ opacity: iframeLoading ? 0 : 1 }}
                                             />
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        ) : (
-                            <div className={styles['no-stream-message']}>
-                                <div className={styles['no-stream-icon']}>⏳</div>
-                                <h3>No Streams Available</h3>
-                                <p>No streams are currently available for this match. Please try again later.</p>
-                            </div>
-                        )}
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className={styles['overlay-empty']}>
+                                    <div className={styles['no-stream-icon']}>⏳</div>
+                                    <div>No streams available for this match.</div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </ModalDialog>
+                </div>
             )}
         </MainNavBars>
     );

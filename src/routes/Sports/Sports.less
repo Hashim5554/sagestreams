@@ -177,6 +177,13 @@
 	color: #ffffff;
 	font-weight: 700;
 	letter-spacing: -0.01em;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.group-icon {
+	font-size: 1.1rem;
 }
 
 .group-count {
@@ -1093,6 +1100,178 @@
 	.stream-details {
 		margin: 0 0.5rem;
 	}
+}
+
+/* Grouping visuals */
+.group-title {
+	color: #ffffff;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.group-icon {
+	font-size: 1.1rem;
+}
+
+/* Custom overlay modal - complete rewrite (no blur) */
+.overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 9999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.overlay-backdrop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.7);
+}
+
+.overlay-dialog {
+	position: relative;
+	width: min(96vw, 1600px);
+	max-width: 1600px;
+	background: #0f0f23;
+	border-radius: 20px;
+	border: 1px solid rgba(255,255,255,0.1);
+	box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+	overflow: hidden;
+	max-height: 94vh;
+	display: flex;
+	flex-direction: column;
+}
+
+.overlay-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 1rem 1rem 0.75rem;
+	background: #12122a;
+	border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.overlay-title-wrap {
+	min-width: 0;
+	flex: 1;
+}
+
+.overlay-title {
+	color: #fff;
+	font-weight: 800;
+	font-size: 1.4rem;
+	letter-spacing: -0.02em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.overlay-subtitle {
+	color: rgba(255,255,255,0.7);
+	font-weight: 600;
+	font-size: 0.95rem;
+	margin-top: 0.15rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.overlay-close {
+	appearance: none;
+	border: 1px solid rgba(255,255,255,0.2);
+	background: rgba(255,255,255,0.08);
+	color: #fff;
+	width: 40px;
+	height: 40px;
+	border-radius: 10px;
+	cursor: pointer;
+	font-size: 1.1rem;
+	font-weight: 700;
+}
+
+.overlay-body {
+	padding: 1rem 1rem 1.25rem;
+	overflow: auto;
+}
+
+.overlay-sources, .overlay-streams {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+}
+
+.chip {
+	appearance: none;
+	border: 1px solid rgba(255,255,255,0.2);
+	background: rgba(255,255,255,0.06);
+	color: #fff;
+	border-radius: 999px;
+	padding: 0.5rem 0.9rem;
+	font-weight: 700;
+	font-size: 0.85rem;
+	cursor: pointer;
+}
+
+.chip-active {
+	border-color: rgba(0,212,255,0.6);
+	background: rgba(0,212,255,0.18);
+	box-shadow: 0 0 0 2px rgba(0,212,255,0.18) inset;
+}
+
+.overlay-player {
+	position: relative;
+	background: #000;
+	border: 1px solid rgba(255,255,255,0.1);
+	border-radius: 14px;
+	padding-top: 56.25%;
+	overflow: hidden;
+}
+
+.overlay-iframe {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+.overlay-player-loading {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	background: rgba(0,0,0,0.8);
+	border: 1px solid rgba(255,255,255,0.15);
+	border-radius: 12px;
+	padding: 1rem 1.25rem;
+	color: #fff;
+	display: flex;
+	gap: 0.75rem;
+	align-items: center;
+}
+
+.overlay-empty {
+	padding: 2rem;
+	text-align: center;
+	color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+	.overlay-dialog { width: 96vw; }
+	.overlay-title { font-size: 1.1rem; }
 }
 
 
