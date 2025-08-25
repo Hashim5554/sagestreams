@@ -49,6 +49,7 @@ const CACHE_TTL_MS = 60_000;
 
 const storageKey = 'streamed_matches_cache_v1';
 const sportsStorageKey = 'streamed_sports_cache_v1';
+const LEAGUE_BADGES_KEY = 'league_badges_cache_v1';
 
 function normalizeUnixTimestamp(ts: number | undefined | null): number | null {
     if (!ts) return null;
@@ -179,46 +180,52 @@ function getPosterUrl(poster: string): string {
     return `${API_BASE}${poster}.webp`;
 }
 
-// Competition icon resolver (emoji fallback). Could be replaced with free icon API later.
-const COMPETITION_ICON_MAP: Record<string, string> = {
-    'UEFA Champions League': '⭐',
-    'Premier League': '🏴',
-    'La Liga': '🇪🇸',
-    'Serie A': '🇮🇹',
-    'Bundesliga': '🇩🇪',
-    'Ligue 1': '🇫🇷',
-    'NBA': '🏀',
-    'NFL': '🏈',
-    'NHL': '🏒',
-    'MLB': '⚾',
-    'UFC': '🥊',
+// TheSportsDB league badge resolver with caching
+async function fetchLeagueBadge(leagueName: string): Promise<string | null> {
+    if (!leagueName) return null;
+    const cache = readCache(LEAGUE_BADGES_KEY) || { at: 0, data: {} };
+    const cachedUrl = cache.data[leagueName];
+    if (cachedUrl) return cachedUrl as string;
+
+    try {
+        const url = `https://www.thesportsdb.com/api/v1/json/1/searchleagues.php?l=${encodeURIComponent(leagueName)}`;
+        const res = await fetch(url, { cache: 'force-cache' });
+        if (!res.ok) throw new Error('Badge fetch failed');
+        const json = await res.json();
+        const league = json?.leagues && Array.isArray(json.leagues) ? json.leagues[0] : null;
+        const badge = league?.strBadge || league?.strLogo || league?.strTrophy || null;
+        if (badge) {
+            const newData = { ...(cache.data || {}), [leagueName]: badge };
+            writeCache(LEAGUE_BADGES_KEY, newData);
+            return badge as string;
+        }
+    } catch {}
+    return null;
+}
+
+const LeagueBadge: React.FC<{ name?: string }> = ({ name }) => {
+    const [badgeUrl, setBadgeUrl] = useState<string | null>(null);
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            if (!name) return;
+            const url = await fetchLeagueBadge(name);
+            if (!ignore) setBadgeUrl(url);
+        })();
+        return () => { ignore = true; };
+    }, [name]);
+    if (!name) return null;
+    return (
+        <div className={styles['comp-badge-wrap']}>
+            {badgeUrl ? (
+                <img className={styles['comp-badge']} src={badgeUrl} alt={name} />
+            ) : (
+                <span className={styles['comp-badge-fallback']}>🏟️</span>
+            )}
+            <span className={styles['comp-name']}>{name}</span>
+        </div>
+    );
 };
-
-function getCompetitionIcon(name?: string): string {
-    if (!name) return '🏟️';
-    const key = Object.keys(COMPETITION_ICON_MAP).find((k) => name.toLowerCase().includes(k.toLowerCase()));
-    return key ? COMPETITION_ICON_MAP[key] : '🏟️';
-}
-
-// Competition priority (most important first)
-const COMPETITION_PRIORITY = [
-    'UEFA Champions League',
-    'Premier League',
-    'La Liga',
-    'Serie A',
-    'Bundesliga',
-    'Ligue 1',
-    'NBA',
-    'NFL',
-    'NHL',
-    'MLB',
-    'UFC',
-];
-
-function competitionRank(name: string): number {
-    const idx = COMPETITION_PRIORITY.findIndex((n) => name.toLowerCase().includes(n.toLowerCase()));
-    return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
-}
 
 const Sports: React.FC = () => {
     const [sports, setSports] = useState<StreamedSport[] | null>(null);
@@ -278,25 +285,28 @@ const Sports: React.FC = () => {
     const liveMatches = useMemo(() => allMatches.filter((m) => isLive(now, m)), [allMatches, now]);
     const upcomingMatches = useMemo(() => allMatches.filter((m) => isUpcoming(now, m)), [allMatches, now]);
 
-    const upcomingByCategory = useMemo(() => {
-        const groups: Record<string, StreamedMatch[]> = {};
-        for (const m of upcomingMatches) {
-            const key = m.category && m.category.trim() ? m.category.trim() : 'Other';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(m);
-        }
-        const orderedKeys = Object.keys(groups).sort((a, b) => {
-            const rankA = competitionRank(a);
-            const rankB = competitionRank(b);
-            if (rankA !== rankB) return rankA - rankB;
-            return a.localeCompare(b);
+    // Upcoming: single block list, sorted by (competition priority, time)
+    const upcomingSorted = useMemo(() => {
+        return [...upcomingMatches].sort((a, b) => {
+            const nameA = a.category || '';
+            const nameB = b.category || '';
+            // Primary sort: competition name alphabetical
+            if (nameA !== nameB) return nameA.localeCompare(nameB);
+            // Secondary sort: time
+            return a.date - b.date;
         });
-        return orderedKeys.map((k) => ({
-            key: k,
-            icon: getCompetitionIcon(k),
-            items: groups[k].sort((a, b) => a.date - b.date),
-        }));
     }, [upcomingMatches]);
+
+    // Compute separators when competition changes
+    const upcomingWithSeparators = useMemo(() => {
+        let prevCat: string | null = null;
+        return upcomingSorted.map((m) => {
+            const cat = (m.category || '').trim();
+            const showSep = prevCat !== null && prevCat !== cat;
+            prevCat = cat;
+            return { match: m, showSep };
+        });
+    }, [upcomingSorted]);
 
     const handleSportChange = async (sportId: string) => {
         if (sportId === selectedSport) return;
@@ -468,25 +478,28 @@ const Sports: React.FC = () => {
                             </section>
                         )}
 
-                        {upcomingByCategory.length > 0 && (
+                        {upcomingWithSeparators.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
                                     <span className={styles['upcoming-indicator']}>⏰</span>
                                     Upcoming
                                 </h2>
-                                <div className={styles['groups']}>
-                                    {upcomingByCategory.map((group) => (
-                                        <div key={group.key} className={styles['group']}>
-                                            <div className={styles['group-header']}>
-                                                <div className={styles['group-title']}>
-                                                    <span className={styles['group-icon']}>{group.icon}</span>
-                                                    {group.key}
-                                                </div>
-                                                <div className={styles['group-count']}>{group.items.length}</div>
+                                <div className={styles['upcoming-list']}>
+                                    {upcomingWithSeparators.map(({ match, showSep }) => (
+                                        <div key={match.id} className={styles['upcoming-row']}>
+                                            {showSep && <div className={styles['separator-line']}></div>}
+                                            <div className={styles['upcoming-left']}>
+                                                <LeagueBadge name={match.category} />
                                             </div>
-                                            <div className={styles['separator-line']}></div>
-                                            <div className={styles['grid']}>
-                                                {group.items.map((match) => renderMatchCard(match, false, true))}
+                                            <div className={styles['upcoming-middle']}>
+                                                <div className={styles['upcoming-title']}>{match.title}</div>
+                                                <div className={styles['upcoming-time']}>{formatTime(match.date)} · {getTimeRemaining(now, match)}</div>
+                                            </div>
+                                            <div className={styles['upcoming-right']}>
+                                                <Button className={styles['watch-button']} onClick={() => handleWatchClick(match)}>
+                                                    <span className={styles['watch-icon']}>▶️</span>
+                                                    Watch
+                                                </Button>
                                             </div>
                                         </div>
                                     ))}
@@ -494,7 +507,7 @@ const Sports: React.FC = () => {
                             </section>
                         )}
 
-                        {liveMatches.length === 0 && upcomingByCategory.length === 0 && allMatches.length > 0 && (
+                        {liveMatches.length === 0 && upcomingWithSeparators.length === 0 && allMatches.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
                                     <span className={styles['ended-indicator']}>🏁</span>
@@ -519,7 +532,7 @@ const Sports: React.FC = () => {
                                 <div className={styles['overlay-title']}>{selectedMatch.title}</div>
                                 {selectedMatch.category && (
                                     <div className={styles['overlay-subtitle']}>
-                                        {getCompetitionIcon(selectedMatch.category)} {selectedMatch.category}
+                                        <LeagueBadge name={selectedMatch.category} />
                                     </div>
                                 )}
                             </div>
