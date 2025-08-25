@@ -50,6 +50,14 @@ const CACHE_TTL_MS = 60_000;
 const storageKey = 'streamed_matches_cache_v1';
 const sportsStorageKey = 'streamed_sports_cache_v1';
 
+// Helpers
+function normalizeUnixTimestamp(ts: number | undefined | null): number | null {
+    if (!ts) return null;
+    // If seconds (10 digits), convert to ms
+    if (ts < 1e12) return ts * 1000;
+    return ts;
+}
+
 // Streamed API functions
 function readCache(key: string): { at: number; data: any } | null {
     try {
@@ -96,11 +104,17 @@ async function fetchMatchesBySport(sportId: string, force = false): Promise<Stre
         const res = await fetch(`${API_BASE}/api/matches/${sportId}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as StreamedMatch[];
-        if (json && Array.isArray(json)) {
-            writeCache(cacheKey, json);
-            return json;
+        const normalized = Array.isArray(json)
+            ? json.map((m) => ({
+                ...m,
+                date: normalizeUnixTimestamp(m.date) || 0
+            }))
+            : json;
+        if (normalized && Array.isArray(normalized)) {
+            writeCache(cacheKey, normalized);
+            return normalized;
         }
-        return json;
+        return normalized as any;
     } catch (e) {
         return cached?.data ?? null;
     }
@@ -115,11 +129,17 @@ async function fetchLiveMatches(force = false): Promise<StreamedMatch[] | null> 
         const res = await fetch(`${API_BASE}/api/matches/live`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as StreamedMatch[];
-        if (json && Array.isArray(json)) {
-            writeCache(storageKey, json);
-            return json;
+        const normalized = Array.isArray(json)
+            ? json.map((m) => ({
+                ...m,
+                date: normalizeUnixTimestamp(m.date) || 0
+            }))
+            : json;
+        if (normalized && Array.isArray(normalized)) {
+            writeCache(storageKey, normalized);
+            return normalized;
         }
-        return json;
+        return normalized as any;
     } catch (e) {
         return cached?.data ?? null;
     }
@@ -147,12 +167,10 @@ function formatTime(ts?: number): string {
 }
 
 function isLive(now: number, match: StreamedMatch): boolean {
-    // A match is live if it started within the last 2 hours and hasn't ended
+    // Live if started within last 2 hours
     const startTime = match.date;
     const currentTime = now;
-    
-    // Match is live if it started within the last 2 hours
-    return currentTime >= startTime && currentTime <= startTime + (2 * 60 * 60 * 1000);
+    return startTime > 0 && currentTime >= startTime && currentTime <= startTime + (2 * 60 * 60 * 1000);
 }
 
 function isUpcoming(now: number, match: StreamedMatch): boolean {
@@ -164,32 +182,20 @@ function getTimeRemaining(now: number, match: StreamedMatch): string {
     const currentTime = now;
     
     if (currentTime < startTime) {
-        // Upcoming match
         const remaining = startTime - currentTime;
         const hours = Math.floor(remaining / (1000 * 60 * 60));
         const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (hours > 0) {
-            return `Starts in ${hours}h ${minutes}m`;
-        } else if (minutes > 0) {
-            return `Starts in ${minutes}m`;
-        } else {
-            return 'Starting now';
-        }
+        if (hours > 0) return `Starts in ${hours}h ${minutes}m`;
+        if (minutes > 0) return `Starts in ${minutes}m`;
+        return 'Starting now';
     } else if (isLive(currentTime, match)) {
-        // Live match
-        const endTime = startTime + (2 * 60 * 60 * 1000); // 2 hours after start
+        const endTime = startTime + (2 * 60 * 60 * 1000);
         const remaining = endTime - currentTime;
         const hours = Math.floor(remaining / (1000 * 60 * 60));
         const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (hours > 0) {
-            return `${hours}h ${minutes}m left`;
-        } else if (minutes > 0) {
-            return `${minutes}m left`;
-        } else {
-            return 'Ending soon';
-        }
+        if (hours > 0) return `${hours}h ${minutes}m left`;
+        if (minutes > 0) return `${minutes}m left`;
+        return 'Ending soon';
     }
     return 'Ended';
 }
@@ -204,7 +210,7 @@ function getPosterUrl(poster: string): string {
 
 const Sports: React.FC = () => {
     const [sports, setSports] = useState<StreamedSport[] | null>(null);
-    const [selectedSport, setSelectedSport] = useState<string>('all');
+    const [selectedSport, setSelectedSport] = useState<string>('');
     const [matches, setMatches] = useState<StreamedMatch[] | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -217,33 +223,29 @@ const Sports: React.FC = () => {
     const [adGuardConfig, setAdGuardConfig] = useState<AdGuardDNSConfig | null>(null);
     const intervalRef = useRef<number | null>(null);
 
-    // Load AdGuard config on component mount
+    // Load AdGuard config
     useEffect(() => {
         const config = getAdGuardConfig();
         setAdGuardConfig(config);
     }, []);
 
-    // Load sports on component mount
+    // Load sports and set default sport
     useEffect(() => {
         const loadSports = async () => {
             const sportsData = await fetchSports();
             setSports(sportsData);
+            if (sportsData && sportsData.length > 0) {
+                setSelectedSport(sportsData[0].id);
+            }
         };
         loadSports();
     }, []);
 
     const load = useCallback(async (force = false) => {
+        if (!selectedSport) return;
         setError(null);
         setLoading(true);
-        
-        let res: StreamedMatch[] | null = null;
-        
-        if (selectedSport === 'all') {
-            res = await fetchLiveMatches(force);
-        } else {
-            res = await fetchMatchesBySport(selectedSport, force);
-        }
-        
+        const res = await fetchMatchesBySport(selectedSport, force);
         if (res === null) {
             setError('Failed to load matches');
         }
@@ -253,6 +255,7 @@ const Sports: React.FC = () => {
 
     useEffect(() => {
         load(false);
+        if (intervalRef.current) window.clearInterval(intervalRef.current);
         intervalRef.current = window.setInterval(() => load(false), 60_000);
         return () => {
             if (intervalRef.current) window.clearInterval(intervalRef.current);
@@ -262,32 +265,12 @@ const Sports: React.FC = () => {
     const now = Date.now();
     const allMatches = useMemo(() => matches ?? [], [matches]);
 
-    const liveMatches = useMemo(() => {
-        return allMatches.filter(match => isLive(now, match));
-    }, [allMatches, now]);
-
-    const upcomingMatches = useMemo(() => {
-        return allMatches.filter(match => isUpcoming(now, match));
-    }, [allMatches, now]);
+    const liveMatches = useMemo(() => allMatches.filter((m) => isLive(now, m)), [allMatches, now]);
+    const upcomingMatches = useMemo(() => allMatches.filter((m) => isUpcoming(now, m)), [allMatches, now]);
 
     const handleSportChange = async (sportId: string) => {
+        if (sportId === selectedSport) return;
         setSelectedSport(sportId);
-        setLoading(true);
-        setError(null);
-        
-        let res: StreamedMatch[] | null = null;
-        
-        if (sportId === 'all') {
-            res = await fetchLiveMatches(true);
-        } else {
-            res = await fetchMatchesBySport(sportId, true);
-        }
-        
-        if (res === null) {
-            setError('Failed to load matches');
-        }
-        setMatches(res);
-        setLoading(false);
     };
 
     const handleWatchClick = async (match: StreamedMatch) => {
@@ -296,14 +279,11 @@ const Sports: React.FC = () => {
         setSelectedStreams(null);
         setSelectedStream(null);
         setSelectedSource('');
-        
-        // Try to get streams for the first available source
         if (match.sources && match.sources.length > 0) {
             const source = match.sources[0];
             setSelectedSource(source.source);
             const streams = await fetchStreams(source.source, source.id);
             setSelectedStreams(streams);
-            
             if (streams && streams.length > 0) {
                 setSelectedStream(streams[0]);
                 setIframeLoading(true);
@@ -314,16 +294,12 @@ const Sports: React.FC = () => {
 
     const handleSourceChange = async (source: string) => {
         if (!selectedMatch) return;
-        
         setStreamsLoading(true);
         setSelectedSource(source);
-        
-        // Find the source object
-        const sourceObj = selectedMatch.sources.find(s => s.source === source);
+        const sourceObj = selectedMatch.sources.find((s) => s.source === source);
         if (sourceObj) {
             const streams = await fetchStreams(sourceObj.source, sourceObj.id);
             setSelectedStreams(streams);
-            
             if (streams && streams.length > 0) {
                 setSelectedStream(streams[0]);
                 setIframeLoading(true);
@@ -337,9 +313,7 @@ const Sports: React.FC = () => {
         setIframeLoading(true);
     };
 
-    const handleIframeLoad = () => {
-        setIframeLoading(false);
-    };
+    const handleIframeLoad = () => setIframeLoading(false);
 
     const handleCloseModal = () => {
         setSelectedMatch(null);
@@ -350,13 +324,13 @@ const Sports: React.FC = () => {
         setStreamsLoading(false);
     };
 
-    const renderMatchCard = (match: StreamedMatch, isLive: boolean = false, isUpcoming: boolean = false) => (
+    const renderMatchCard = (match: StreamedMatch, isLiveMatch: boolean = false, isUpcomingMatch: boolean = false) => (
         <div key={match.id} className={styles['card']}>
-            <div className={styles['poster']}> 
+            <div className={styles['poster']}>
                 {match.poster ? (
-                    <img 
-                        className={styles['poster-img']} 
-                        src={getPosterUrl(match.poster)} 
+                    <img
+                        className={styles['poster-img']}
+                        src={getPosterUrl(match.poster)}
                         alt={match.title}
                         onError={(e) => {
                             const target = e.currentTarget as HTMLImageElement;
@@ -368,8 +342,8 @@ const Sports: React.FC = () => {
                 ) : (
                     <div className={styles['poster-fallback']} />
                 )}
-                {isLive && <div className={styles['badge-live']}>LIVE</div>}
-                {isUpcoming && <div className={styles['badge-upcoming']}>SOON</div>}
+                {isLiveMatch && <div className={styles['badge-live']}>LIVE</div>}
+                {isUpcomingMatch && <div className={styles['badge-upcoming']}>SOON</div>}
                 <div className={styles['time-remaining']}>{getTimeRemaining(now, match)}</div>
             </div>
             <div className={styles['card-body']}>
@@ -378,9 +352,9 @@ const Sports: React.FC = () => {
                     <div className={styles['card-teams']}>
                         {match.teams.home && (
                             <div className={styles['team']}>
-                                <img 
-                                    className={styles['team-badge']} 
-                                    src={getTeamBadgeUrl(match.teams.home.badge)} 
+                                <img
+                                    className={styles['team-badge']}
+                                    src={getTeamBadgeUrl(match.teams.home.badge)}
                                     alt={match.teams.home.name}
                                     onError={(e) => {
                                         e.currentTarget.style.display = 'none';
@@ -392,9 +366,9 @@ const Sports: React.FC = () => {
                         <span className={styles['vs']}>vs</span>
                         {match.teams.away && (
                             <div className={styles['team']}>
-                                <img 
-                                    className={styles['team-badge']} 
-                                    src={getTeamBadgeUrl(match.teams.away.badge)} 
+                                <img
+                                    className={styles['team-badge']}
+                                    src={getTeamBadgeUrl(match.teams.away.badge)}
                                     alt={match.teams.away.name}
                                     onError={(e) => {
                                         e.currentTarget.style.display = 'none';
@@ -408,7 +382,7 @@ const Sports: React.FC = () => {
                 <div className={styles['time']}>{formatTime(match.date)}</div>
                 <Button className={styles['watch-button']} onClick={() => handleWatchClick(match)}>
                     <span className={styles['watch-icon']}>▶️</span>
-                    {isLive ? 'Watch Live' : 'Watch'}
+                    {isLiveMatch ? 'Watch Live' : 'Watch'}
                 </Button>
             </div>
         </div>
@@ -417,18 +391,10 @@ const Sports: React.FC = () => {
     return (
         <MainNavBars className={styles['sports-container']} route={'sports'} title={'SageStreams'}>
             <div className={classnames(styles['sports-content'], 'animation-fade-in')}>
-                {/* Sports Navigation */}
-                {sports && (
+                {/* Sports Navigation (no All Sports) */}
+                {sports && sports.length > 0 && (
                     <div className={styles['sports-navigation']}>
                         <div className={styles['sports-tabs']}>
-                            <Button
-                                className={classnames(styles['sport-tab'], {
-                                    [styles['sport-tab-active']]: selectedSport === 'all'
-                                })}
-                                onClick={() => handleSportChange('all')}
-                            >
-                                🏆 All Sports
-                            </Button>
                             {sports.map((sport) => (
                                 <Button
                                     key={sport.id}
@@ -448,7 +414,7 @@ const Sports: React.FC = () => {
                 {loading ? (
                     <div className={styles['message']}>
                         <div className={styles['loading-spinner']}></div>
-                        <div>Loading {selectedSport === 'all' ? 'live sports' : `${sports?.find(s => s.id === selectedSport)?.name || 'sports'} matches`}…</div>
+                        <div>Loading {sports?.find((s) => s.id === selectedSport)?.name || 'sports'} matches…</div>
                     </div>
                 ) : error ? (
                     <div className={styles['message']}>
@@ -458,14 +424,14 @@ const Sports: React.FC = () => {
                 ) : !matches || allMatches.length === 0 ? (
                     <div className={styles['message']}>
                         <div className={styles['empty-icon']}>🏟️</div>
-                        <div>No matches available for {selectedSport === 'all' ? 'live sports' : `${sports?.find(s => s.id === selectedSport)?.name || 'this sport'}`}</div>
+                        <div>No matches available for {sports?.find((s) => s.id === selectedSport)?.name || 'this sport'}</div>
                     </div>
                 ) : (
                     <>
                         {liveMatches.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
-                                    <span className={styles['live-indicator']}>🔴</span>
+                                    <span className={styles['live-dot']} />
                                     Live Now ({liveMatches.length})
                                 </h2>
                                 <div className={styles['grid']}>
@@ -502,56 +468,51 @@ const Sports: React.FC = () => {
             </div>
 
             {selectedMatch && (
-                <ModalDialog 
-                    className={styles['modal']} 
+                <ModalDialog
+                    className={styles['modal']}
                     title={
                         <div className={styles['modal-header']}>
                             <div className={styles['modal-title-content']}>
                                 <h2 className={styles['modal-title']}>{selectedMatch.title}</h2>
                                 {selectedMatch.category && <div className={styles['modal-subtitle']}>{selectedMatch.category}</div>}
                             </div>
-                            <Button className={styles['close-button']} onClick={handleCloseModal}>
-                                ✕
-                            </Button>
+                            <Button className={styles['close-button']} onClick={handleCloseModal}>✕</Button>
                         </div>
-                    } 
+                    }
                     onCloseRequest={handleCloseModal}
                     buttons={[]}
                     dataset={{}}
                     background={false}
                 >
                     <div className={styles['modal-content']}>
+                        {/* Compact Controls Bar */}
+                        {selectedMatch.sources && selectedMatch.sources.length > 0 && (
+                            <div className={styles['source-selector']}>
+                                <div className={styles['source-options']}>
+                                    {selectedMatch.sources.map((source) => (
+                                        <Button
+                                            key={source.source}
+                                            className={classnames(styles['source-option'], {
+                                                [styles['source-option-active']]: selectedSource === source.source
+                                            })}
+                                            onClick={() => handleSourceChange(source.source)}
+                                        >
+                                            {source.source.toUpperCase()}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {streamsLoading ? (
                             <div className={styles['stream-loading']}>
                                 <div className={styles['loading-spinner']}></div>
-                                <div>Loading streams...</div>
+                                <div>Loading streams…</div>
                             </div>
                         ) : selectedStreams && selectedStreams.length > 0 ? (
                             <div className={styles['stream-container']}>
-                                {/* Source Selector */}
-                                {selectedMatch.sources && selectedMatch.sources.length > 1 && (
-                                    <div className={styles['source-selector']}>
-                                        <h3>Select Source:</h3>
-                                        <div className={styles['source-options']}>
-                                            {selectedMatch.sources.map((source) => (
-                                                <Button
-                                                    key={source.source}
-                                                    className={classnames(styles['source-option'], {
-                                                        [styles['source-option-active']]: selectedSource === source.source
-                                                    })}
-                                                    onClick={() => handleSourceChange(source.source)}
-                                                >
-                                                    {source.source.toUpperCase()}
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Stream Selector */}
                                 {selectedStreams.length > 1 && (
                                     <div className={styles['stream-selector']}>
-                                        <h3>Select Stream:</h3>
                                         <div className={styles['stream-options']}>
                                             {selectedStreams.map((stream) => (
                                                 <Button
@@ -561,19 +522,19 @@ const Sports: React.FC = () => {
                                                     })}
                                                     onClick={() => handleStreamSelect(stream)}
                                                 >
-                                                    Stream {stream.streamNo} - {stream.language} {stream.hd ? '(HD)' : '(SD)'}
+                                                    S{stream.streamNo} · {stream.language} · {stream.hd ? 'HD' : 'SD'}
                                                 </Button>
                                             ))}
                                         </div>
                                     </div>
                                 )}
-                                
+
                                 {selectedStream && (
                                     <>
                                         {iframeLoading && (
                                             <div className={styles['iframe-loading']}>
                                                 <div className={styles['loading-spinner']}></div>
-                                                <div>Loading stream...</div>
+                                                <div>Loading stream…</div>
                                             </div>
                                         )}
                                         <div className={styles['iframe-container']}>
@@ -587,35 +548,6 @@ const Sports: React.FC = () => {
                                                 style={{ opacity: iframeLoading ? 0 : 1 }}
                                             />
                                         </div>
-                                        <div className={styles['stream-info']}>
-                                            <div className={styles['stream-meta']}>
-                                                <div className={styles['stream-details']}>
-                                                    <span className={styles['detail-label']}>Quality:</span>
-                                                    <span className={styles['detail-value']}>{selectedStream.hd ? 'HD' : 'SD'}</span>
-                                                </div>
-                                                <div className={styles['stream-details']}>
-                                                    <span className={styles['detail-label']}>Language:</span>
-                                                    <span className={styles['detail-value']}>{selectedStream.language}</span>
-                                                </div>
-                                                <div className={styles['stream-details']}>
-                                                    <span className={styles['detail-label']}>Source:</span>
-                                                    <span className={styles['detail-value']}>{selectedStream.source}</span>
-                                                </div>
-                                            </div>
-                                            <div className={styles['stream-actions']}>
-                                                <Button className={styles['refresh-button']} onClick={() => window.location.reload()}>
-                                                    🔄 Refresh Stream
-                                                </Button>
-                                                <Button className={styles['fullscreen-button']} onClick={() => {
-                                                    const iframe = document.querySelector(`.${styles['iframe']}`) as HTMLIFrameElement;
-                                                    if (iframe && iframe.requestFullscreen) {
-                                                        iframe.requestFullscreen();
-                                                    }
-                                                }}>
-                                                    ⛶ Fullscreen
-                                                </Button>
-                                            </div>
-                                        </div>
                                     </>
                                 )}
                             </div>
@@ -624,22 +556,6 @@ const Sports: React.FC = () => {
                                 <div className={styles['no-stream-icon']}>⏳</div>
                                 <h3>No Streams Available</h3>
                                 <p>No streams are currently available for this match. Please try again later.</p>
-                                <div className={styles['match-details']}>
-                                    <div className={styles['detail-item']}>
-                                        <strong>Match:</strong>
-                                        <span>{selectedMatch.title}</span>
-                                    </div>
-                                    {selectedMatch.category && (
-                                        <div className={styles['detail-item']}>
-                                            <strong>Category:</strong>
-                                            <span>{selectedMatch.category}</span>
-                                        </div>
-                                    )}
-                                    <div className={styles['detail-item']}>
-                                        <strong>Time:</strong>
-                                        <span>{formatTime(selectedMatch.date)}</span>
-                                    </div>
-                                </div>
                             </div>
                         )}
                     </div>
