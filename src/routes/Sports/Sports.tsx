@@ -50,15 +50,12 @@ const CACHE_TTL_MS = 60_000;
 const storageKey = 'streamed_matches_cache_v1';
 const sportsStorageKey = 'streamed_sports_cache_v1';
 
-// Helpers
 function normalizeUnixTimestamp(ts: number | undefined | null): number | null {
     if (!ts) return null;
-    // If seconds (10 digits), convert to ms
     if (ts < 1e12) return ts * 1000;
     return ts;
 }
 
-// Streamed API functions
 function readCache(key: string): { at: number; data: any } | null {
     try {
         const raw = localStorage.getItem(key);
@@ -167,7 +164,6 @@ function formatTime(ts?: number): string {
 }
 
 function isLive(now: number, match: StreamedMatch): boolean {
-    // Live if started within last 2 hours
     const startTime = match.date;
     const currentTime = now;
     return startTime > 0 && currentTime >= startTime && currentTime <= startTime + (2 * 60 * 60 * 1000);
@@ -223,13 +219,11 @@ const Sports: React.FC = () => {
     const [adGuardConfig, setAdGuardConfig] = useState<AdGuardDNSConfig | null>(null);
     const intervalRef = useRef<number | null>(null);
 
-    // Load AdGuard config
     useEffect(() => {
         const config = getAdGuardConfig();
         setAdGuardConfig(config);
     }, []);
 
-    // Load sports and set default sport
     useEffect(() => {
         const loadSports = async () => {
             const sportsData = await fetchSports();
@@ -267,6 +261,23 @@ const Sports: React.FC = () => {
 
     const liveMatches = useMemo(() => allMatches.filter((m) => isLive(now, m)), [allMatches, now]);
     const upcomingMatches = useMemo(() => allMatches.filter((m) => isUpcoming(now, m)), [allMatches, now]);
+
+    const upcomingByCategory = useMemo(() => {
+        const groups: Record<string, StreamedMatch[]> = {};
+        for (const m of upcomingMatches) {
+            const key = m.category && m.category.trim() ? m.category.trim() : 'Other';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(m);
+        }
+        // Sort groups alphabetically; within group sort by date
+        const ordered = Object.keys(groups)
+            .sort((a, b) => a.localeCompare(b))
+            .map((k) => ({
+                key: k,
+                items: groups[k].sort((a, b) => a.date - b.date),
+            }));
+        return ordered;
+    }, [upcomingMatches]);
 
     const handleSportChange = async (sportId: string) => {
         if (sportId === selectedSport) return;
@@ -391,7 +402,6 @@ const Sports: React.FC = () => {
     return (
         <MainNavBars className={styles['sports-container']} route={'sports'} title={'SageStreams'}>
             <div className={classnames(styles['sports-content'], 'animation-fade-in')}>
-                {/* Sports Navigation (no All Sports) */}
                 {sports && sports.length > 0 && (
                     <div className={styles['sports-navigation']}>
                         <div className={styles['sports-tabs']}>
@@ -410,7 +420,6 @@ const Sports: React.FC = () => {
                     </div>
                 )}
 
-                {/* Content */}
                 {loading ? (
                     <div className={styles['message']}>
                         <div className={styles['loading-spinner']}></div>
@@ -440,19 +449,30 @@ const Sports: React.FC = () => {
                             </section>
                         )}
 
-                        {upcomingMatches.length > 0 && (
+                        {upcomingByCategory.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
                                     <span className={styles['upcoming-indicator']}>⏰</span>
-                                    Upcoming ({upcomingMatches.length})
+                                    Upcoming by League
                                 </h2>
-                                <div className={styles['grid']}>
-                                    {upcomingMatches.map((match) => renderMatchCard(match, false, true))}
+                                <div className={styles['groups']}>
+                                    {upcomingByCategory.map((group) => (
+                                        <div key={group.key} className={styles['group']}>
+                                            <div className={styles['group-header']}>
+                                                <div className={styles['group-title']}>{group.key}</div>
+                                                <div className={styles['group-count']}>{group.items.length}</div>
+                                            </div>
+                                            <div className={styles['separator-line']}></div>
+                                            <div className={styles['grid']}>
+                                                {group.items.map((match) => renderMatchCard(match, false, true))}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </section>
                         )}
 
-                        {liveMatches.length === 0 && upcomingMatches.length === 0 && allMatches.length > 0 && (
+                        {liveMatches.length === 0 && upcomingByCategory.length === 0 && allMatches.length > 0 && (
                             <section className={styles['section']}>
                                 <h2 className={styles['section-title']}>
                                     <span className={styles['ended-indicator']}>🏁</span>
@@ -485,7 +505,6 @@ const Sports: React.FC = () => {
                     background={false}
                 >
                     <div className={styles['modal-content']}>
-                        {/* Compact Controls Bar */}
                         {selectedMatch.sources && selectedMatch.sources.length > 0 && (
                             <div className={styles['source-selector']}>
                                 <div className={styles['source-options']}>
