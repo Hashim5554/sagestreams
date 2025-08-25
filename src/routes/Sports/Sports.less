@@ -1339,4 +1339,45 @@
 	.upcoming-right { justify-content: flex-start; }
 }
 
+.competition-bar {
+	margin: 1rem 0 1.5rem;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	background: rgba(255,255,255,0.03);
+	border: 1px solid rgba(255,255,255,0.08);
+	border-radius: 16px;
+	padding: 0.75rem;
+}
+
+.competition-left { display: flex; align-items: center; gap: 0.5rem; }
+
+.competition-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.comp-tab {
+	appearance: none;
+	border: 1px solid rgba(255,255,255,0.2);
+	background: rgba(255,255,255,0.06);
+	color: #fff;
+	border-radius: 999px;
+	padding: 0.4rem 0.8rem;
+	font-weight: 700;
+	font-size: 0.8rem;
+	cursor: pointer;
+}
+
+.comp-tab-active {
+	border-color: rgba(0,212,255,0.6);
+	background: rgba(0,212,255,0.18);
+	box-shadow: 0 0 0 2px rgba(0,212,255,0.18) inset;
+}
+
+.inline-league { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: 0.5rem; }
+
+.comp-mini { display: inline-flex; align-items: center; gap: 0.4rem; }
+
 
