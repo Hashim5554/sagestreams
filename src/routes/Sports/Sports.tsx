@@ -50,6 +50,7 @@ const CACHE_TTL_MS = 60_000;
 const storageKey = 'streamed_matches_cache_v1';
 const sportsStorageKey = 'streamed_sports_cache_v1';
 const LEAGUE_BADGES_KEY = 'league_badges_cache_v1';
+const MATCH_LEAGUE_CACHE_KEY = 'match_league_cache_v1';
 
 function normalizeUnixTimestamp(ts: number | undefined | null): number | null {
     if (!ts) return null;
@@ -203,6 +204,21 @@ async function fetchLeagueBadge(leagueName: string): Promise<string | null> {
     return null;
 }
 
+// Resolve competition via TheSportsDB by team name
+async function resolveCompetitionByTeam(teamName: string): Promise<string | null> {
+    try {
+        const url = `https://www.thesportsdb.com/api/v1/json/1/searchteams.php?t=${encodeURIComponent(teamName)}`;
+        const res = await fetch(url, { cache: 'force-cache' });
+        if (!res.ok) throw new Error('Team fetch failed');
+        const json = await res.json();
+        const team = json?.teams && Array.isArray(json.teams) ? json.teams[0] : null;
+        const league: string | null = team?.strLeague || team?.strLeague2 || team?.strLeague3 || null;
+        return league && typeof league === 'string' ? league : null;
+    } catch {
+        return null;
+    }
+}
+
 const LeagueBadge: React.FC<{ name?: string }> = ({ name }) => {
     const [badgeUrl, setBadgeUrl] = useState<string | null>(null);
     useEffect(() => {
@@ -244,6 +260,10 @@ const Sports: React.FC = () => {
 
     // NEW: competition selection
     const [selectedCompetition, setSelectedCompetition] = useState<string>('');
+    const [competitionByMatch, setCompetitionByMatch] = useState<Record<string, string>>(() => {
+        const cached = readCache(MATCH_LEAGUE_CACHE_KEY);
+        return (cached?.data as Record<string, string>) || {};
+    });
 
     useEffect(() => {
         const config = getAdGuardConfig();
@@ -281,6 +301,34 @@ const Sports: React.FC = () => {
             if (intervalRef.current) window.clearInterval(intervalRef.current);
         };
     }, [load]);
+
+    // Resolve competitions for visible matches and cache results
+    useEffect(() => {
+        const unresolved = (matches || []).filter((m) => !competitionByMatch[m.id]);
+        if (unresolved.length === 0) return;
+        let cancelled = false;
+        (async () => {
+            const updates: Record<string, string> = {};
+            for (const m of unresolved) {
+                const teamName = m.teams?.home?.name || m.teams?.away?.name || '';
+                const fromTitle = !teamName && m.title ? m.title.split(/vs|VS|v\.|-/)[0]?.trim() : '';
+                const query = teamName || fromTitle;
+                if (!query) continue;
+                const league = await resolveCompetitionByTeam(query);
+                if (league) {
+                    updates[m.id] = league;
+                }
+            }
+            if (!cancelled && Object.keys(updates).length > 0) {
+                setCompetitionByMatch((prev) => {
+                    const next = { ...prev, ...updates };
+                    writeCache(MATCH_LEAGUE_CACHE_KEY, next);
+                    return next;
+                });
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [matches]);
 
     const now = Date.now();
     const allMatches = useMemo(() => matches ?? [], [matches]);
@@ -391,75 +439,77 @@ const Sports: React.FC = () => {
         setStreamsLoading(false);
     };
 
-    const renderMatchCard = (match: StreamedMatch, isLiveMatch: boolean = false, isUpcomingMatch: boolean = false) => (
-        <div key={match.id} className={styles['card']}>
-            <div className={styles['poster']}>
-                {match.poster ? (
-                    <img
-                        className={styles['poster-img']}
-                        src={getPosterUrl(match.poster)}
-                        alt={match.title}
-                        onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = 'none';
-                            const fallback = target.parentElement?.querySelector('.poster-fallback') as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                        }}
-                    />
-                ) : (
-                    <div className={styles['poster-fallback']} />
-                )}
-                {isLiveMatch && <div className={styles['badge-live']}>LIVE</div>}
-                {isUpcomingMatch && <div className={styles['badge-upcoming']}>SOON</div>}
-                <div className={styles['time-remaining']}>{getTimeRemaining(now, match)}</div>
+    const renderMatchCard = (match: StreamedMatch, isLiveMatch: boolean = false, isUpcomingMatch: boolean = false) => {
+        const compName = competitionByMatch[match.id] || match.category;
+        return (
+            <div key={match.id} className={styles['card']}>
+                <div className={styles['poster']}>
+                    {match.poster ? (
+                        <img
+                            className={styles['poster-img']}
+                            src={getPosterUrl(match.poster)}
+                            alt={match.title}
+                            onError={(e) => {
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.style.display = 'none';
+                                const fallback = target.parentElement?.querySelector('.poster-fallback') as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                            }}
+                        />
+                    ) : (
+                        <div className={styles['poster-fallback']} />
+                    )}
+                    {isLiveMatch && <div className={styles['badge-live']}>LIVE</div>}
+                    {isUpcomingMatch && <div className={styles['badge-upcoming']}>SOON</div>}
+                    <div className={styles['time-remaining']}>{getTimeRemaining(now, match)}</div>
+                </div>
+                <div className={styles['card-body']}>
+                    {isLiveMatch && compName && (
+                        <div className={styles['card-subtitle']}>
+                            <LeagueBadge name={compName} />
+                        </div>
+                    )}
+                    <div className={styles['card-title']}>{match.title}</div>
+                    {match.teams && (
+                        <div className={styles['card-teams']}>
+                            {match.teams.home && (
+                                <div className={styles['team']}>
+                                    <img
+                                        className={styles['team-badge']}
+                                        src={getTeamBadgeUrl(match.teams.home.badge)}
+                                        alt={match.teams.home.name}
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                        }}
+                                    />
+                                    <span className={styles['team-name']}>{match.teams.home.name}</span>
+                                </div>
+                            )}
+                            <span className={styles['vs']}>vs</span>
+                            {match.teams.away && (
+                                <div className={styles['team']}>
+                                    <img
+                                        className={styles['team-badge']}
+                                        src={getTeamBadgeUrl(match.teams.away.badge)}
+                                        alt={match.teams.away.name}
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                        }}
+                                    />
+                                    <span className={styles['team-name']}>{match.teams.away.name}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <div className={styles['time']}>{formatTime(match.date)}</div>
+                    <Button className={styles['watch-button']} onClick={() => handleWatchClick(match)}>
+                        <span className={styles['watch-icon']}>▶️</span>
+                        {isLiveMatch ? 'Watch Live' : 'Watch'}
+                    </Button>
+                </div>
             </div>
-            <div className={styles['card-body']}>
-                {/* NEW: show competition inside card for Live */}
-                {isLiveMatch && match.category && (
-                    <div className={styles['card-subtitle']}>
-                        <LeagueBadge name={match.category} />
-                    </div>
-                )}
-                <div className={styles['card-title']}>{match.title}</div>
-                {match.teams && (
-                    <div className={styles['card-teams']}>
-                        {match.teams.home && (
-                            <div className={styles['team']}>
-                                <img
-                                    className={styles['team-badge']}
-                                    src={getTeamBadgeUrl(match.teams.home.badge)}
-                                    alt={match.teams.home.name}
-                                    onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                    }}
-                                />
-                                <span className={styles['team-name']}>{match.teams.home.name}</span>
-                            </div>
-                        )}
-                        <span className={styles['vs']}>vs</span>
-                        {match.teams.away && (
-                            <div className={styles['team']}>
-                                <img
-                                    className={styles['team-badge']}
-                                    src={getTeamBadgeUrl(match.teams.away.badge)}
-                                    alt={match.teams.away.name}
-                                    onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                    }}
-                                />
-                                <span className={styles['team-name']}>{match.teams.away.name}</span>
-                            </div>
-                        )}
-                    </div>
-                )}
-                <div className={styles['time']}>{formatTime(match.date)}</div>
-                <Button className={styles['watch-button']} onClick={() => handleWatchClick(match)}>
-                    <span className={styles['watch-icon']}>▶️</span>
-                    {isLiveMatch ? 'Watch Live' : 'Watch'}
-                </Button>
-            </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <MainNavBars className={styles['sports-container']} route={'sports'} title={'SageStreams'}>
