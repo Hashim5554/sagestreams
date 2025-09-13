@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classnames from 'classnames';
 import { MainNavBars, Button, ModalDialog, Image } from 'stremio/components';
+import ModalX from '../../components/ModalX';
 import styles from './Sports.less';
 
 type StreamedMatch = {
@@ -81,8 +82,19 @@ async function fetchSports(force = false): Promise<StreamedSport[] | null> {
         return cached.data;
     }
     try {
-        const res = await fetch(`${API_BASE}/api/sports`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        const res = await fetch(`${API_BASE}/api/sports`, { 
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+            console.warn(`Sports API error: HTTP ${res.status}`);
+            throw new Error(`HTTP ${res.status}`);
+        }
         const json = (await res.json()) as StreamedSport[];
         if (json && Array.isArray(json)) {
             writeCache(sportsStorageKey, json);
@@ -90,6 +102,7 @@ async function fetchSports(force = false): Promise<StreamedSport[] | null> {
         }
         return json;
     } catch (e) {
+        console.warn('Failed to fetch sports:', e);
         return cached?.data ?? null;
     }
 }
@@ -101,8 +114,19 @@ async function fetchMatchesBySport(sportId: string, force = false): Promise<Stre
         return cached.data;
     }
     try {
-        const res = await fetch(`${API_BASE}/api/matches/${sportId}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        const res = await fetch(`${API_BASE}/api/matches/${sportId}`, { 
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+            console.warn(`Matches API error for sport ${sportId}: HTTP ${res.status}`);
+            throw new Error(`HTTP ${res.status}`);
+        }
         const json = (await res.json()) as StreamedMatch[];
         const normalized = Array.isArray(json)
             ? json.map((m) => ({
@@ -116,6 +140,7 @@ async function fetchMatchesBySport(sportId: string, force = false): Promise<Stre
         }
         return normalized as any;
     } catch (e) {
+        console.warn(`Failed to fetch matches for sport ${sportId}:`, e);
         return cached?.data ?? null;
     }
 }
@@ -126,8 +151,19 @@ async function fetchLiveMatches(force = false): Promise<StreamedMatch[] | null> 
         return cached.data;
     }
     try {
-        const res = await fetch(`${API_BASE}/api/matches/live`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        const res = await fetch(`${API_BASE}/api/matches/live`, { 
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+            console.warn(`Live matches API error: HTTP ${res.status}`);
+            throw new Error(`HTTP ${res.status}`);
+        }
         const json = (await res.json()) as StreamedMatch[];
         const normalized = Array.isArray(json)
             ? json.map((m) => ({
@@ -141,17 +177,30 @@ async function fetchLiveMatches(force = false): Promise<StreamedMatch[] | null> 
         }
         return normalized as any;
     } catch (e) {
+        console.warn('Failed to fetch live matches:', e);
         return cached?.data ?? null;
     }
 }
 
 async function fetchStreams(source: string, id: string): Promise<StreamedStream[] | null> {
     try {
-        const res = await fetch(`${API_BASE}/api/stream/${source}/${id}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        const res = await fetch(`${API_BASE}/api/stream/${source}/${id}`, { 
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+            console.warn(`Streams API error for ${source}/${id}: HTTP ${res.status}`);
+            throw new Error(`HTTP ${res.status}`);
+        }
         const json = (await res.json()) as StreamedStream[];
         return json && Array.isArray(json) ? json : null;
     } catch (e) {
+        console.warn(`Failed to fetch streams for ${source}/${id}:`, e);
         return null;
     }
 }
@@ -223,6 +272,40 @@ const Sports: React.FC = () => {
     const [adGuardConfig, setAdGuardConfig] = useState<AdGuardDNSConfig | null>(null);
     const intervalRef = useRef<number | null>(null);
 
+    // Suppress benign/3rd-party errors that can block interactions in some environments
+    useEffect(() => {
+        const onError = (event: ErrorEvent) => {
+            try {
+                const msg = event?.message || '';
+                if (
+                    typeof msg === 'string' && (
+                        msg.includes('qzqz is not defined') ||
+                        msg.includes('ERR_BLOCKED_BY_CLIENT')
+                    )
+                ) {
+                    event.preventDefault();
+                    return false;
+                }
+            } catch {}
+            return undefined as any;
+        };
+        const onRejection = (event: PromiseRejectionEvent) => {
+            try {
+                const reason: any = event?.reason;
+                const msg = typeof reason === 'string' ? reason : (reason?.message || '');
+                if (typeof msg === 'string' && /interrupted|AbortError/i.test(msg)) {
+                    event.preventDefault();
+                }
+            } catch {}
+        };
+        window.addEventListener('error', onError);
+        window.addEventListener('unhandledrejection', onRejection);
+        return () => {
+            window.removeEventListener('error', onError);
+            window.removeEventListener('unhandledrejection', onRejection);
+        };
+    }, []);
+
     // Load AdGuard config
     useEffect(() => {
         const config = getAdGuardConfig();
@@ -245,11 +328,19 @@ const Sports: React.FC = () => {
         if (!selectedSport) return;
         setError(null);
         setLoading(true);
-        const res = await fetchMatchesBySport(selectedSport, force);
-        if (res === null) {
-            setError('Failed to load matches');
+        try {
+            const res = await fetchMatchesBySport(selectedSport, force);
+            if (res === null) {
+                setError('Unable to load matches. The sports service may be temporarily unavailable.');
+            } else {
+                setError(null);
+            }
+            setMatches(res);
+        } catch (err) {
+            console.error('Error loading matches:', err);
+            setError('Unable to load matches. Please check your connection and try again.');
+            setMatches(null);
         }
-        setMatches(res);
         setLoading(false);
     }, [selectedSport]);
 
@@ -274,6 +365,7 @@ const Sports: React.FC = () => {
     };
 
     const handleWatchClick = async (match: StreamedMatch) => {
+        // Open in modal (as requested)
         setSelectedMatch(match);
         setStreamsLoading(true);
         setSelectedStreams(null);
@@ -420,6 +512,12 @@ const Sports: React.FC = () => {
                     <div className={styles['message']}>
                         <div className={styles['error-icon']}>⚠️</div>
                         <div>{error}</div>
+                        <Button 
+                            className={styles['retry-button']} 
+                            onClick={() => load(true)}
+                        >
+                            🔄 Try Again
+                        </Button>
                     </div>
                 ) : !matches || allMatches.length === 0 ? (
                     <div className={styles['message']}>
@@ -467,27 +565,24 @@ const Sports: React.FC = () => {
                 )}
             </div>
 
-            {selectedMatch && (
-                <div className={styles['overlay']} role="dialog" aria-modal="true">
-                    <div className={styles['overlay-backdrop']} onClick={handleCloseModal} />
-                    <div className={styles['overlay-dialog']}>
-                        <div className={styles['overlay-header']}>
-                            <div className={styles['overlay-title-wrap']}>
-                                <div className={styles['overlay-title']}>{selectedMatch.title}</div>
-                                {selectedMatch.category && (
-                                    <div className={styles['overlay-subtitle']}>{selectedMatch.category}</div>
-                                )}
-                            </div>
-                            <button className={styles['overlay-close']} onClick={handleCloseModal} aria-label="Close">✕</button>
-                        </div>
-                        <div className={styles['overlay-body']}>
-                            {selectedMatch.sources && selectedMatch.sources.length > 0 && (
-                                <div className={styles['overlay-sources']}>
+            <ModalX
+                isOpen={!!selectedMatch}
+                onClose={handleCloseModal}
+                title={selectedMatch?.title}
+                subtitle={selectedMatch?.category}
+                size="xl"
+            >
+                {selectedMatch && (
+                    <div>
+                        {selectedMatch.sources && selectedMatch.sources.length > 0 && (
+                            <div className={styles['source-selector']}>
+                                <h3>Sources</h3>
+                                <div className={styles['source-options']}>
                                     {selectedMatch.sources.map((source) => (
                                         <button
                                             key={source.source}
-                                            className={classnames(styles['chip'], {
-                                                [styles['chip-active']]: selectedSource === source.source
+                                            className={classnames(styles['source-option'], {
+                                                [styles['source-option-active']]: selectedSource === source.source
                                             })}
                                             onClick={() => handleSourceChange(source.source)}
                                         >
@@ -495,21 +590,25 @@ const Sports: React.FC = () => {
                                         </button>
                                     ))}
                                 </div>
-                            )}
-                            {streamsLoading ? (
-                                <div className={styles['overlay-loading']}>
-                                    <div className={styles['loading-spinner']} />
-                                    <div>Loading streams…</div>
-                                </div>
-                            ) : selectedStreams && selectedStreams.length > 0 ? (
-                                <>
-                                    {selectedStreams.length > 1 && (
-                                        <div className={styles['overlay-streams']}>
+                            </div>
+                        )}
+
+                        {streamsLoading ? (
+                            <div className={styles['stream-loading']}>
+                                <div className={styles['loading-spinner']} />
+                                <div>Loading streams…</div>
+                            </div>
+                        ) : selectedStreams && selectedStreams.length > 0 ? (
+                            <>
+                                {selectedStreams.length > 1 && (
+                                    <div className={styles['stream-selector']}>
+                                        <h3>Streams</h3>
+                                        <div className={styles['stream-options']}>
                                             {selectedStreams.map((stream) => (
                                                 <button
                                                     key={stream.id}
-                                                    className={classnames(styles['chip'], {
-                                                        [styles['chip-active']]: selectedStream?.id === stream.id
+                                                    className={classnames(styles['stream-option'], {
+                                                        [styles['stream-option-active']]: selectedStream?.id === stream.id
                                                     })}
                                                     onClick={() => handleStreamSelect(stream)}
                                                 >
@@ -517,37 +616,54 @@ const Sports: React.FC = () => {
                                                 </button>
                                             ))}
                                         </div>
+                                    </div>
+                                )}
+
+                                <div className={styles['iframe-container']}>
+                                    {iframeLoading && (
+                                        <div className={styles['iframe-loading']}>
+                                            <div className={styles['loading-spinner']} />
+                                            <div>Loading stream…</div>
+                                        </div>
                                     )}
-                                    <div className={styles['overlay-player']}>
-                                        {iframeLoading && (
-                                            <div className={styles['overlay-player-loading']}>
-                                                <div className={styles['loading-spinner']} />
-                                                <div>Loading stream…</div>
+                                    {selectedStream && (
+                                        <iframe
+                                            className={styles['iframe']}
+                                            src={selectedStream.embedUrl}
+                                            title={selectedMatch.title}
+                                            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                                            allowFullScreen
+                                            onLoad={handleIframeLoad}
+                                            style={{ opacity: iframeLoading ? 0 : 1 }}
+                                        />
+                                    )}
+                                </div>
+
+                                <div className={styles['stream-info']}>
+                                    <div className={styles['stream-meta']}>
+                                        {selectedMatch.category && (
+                                            <div className={styles['stream-category']}>
+                                                <span className={styles['category-icon']}>🏷️</span>
+                                                <span>{selectedMatch.category}</span>
                                             </div>
                                         )}
-                                        {selectedStream && (
-                                            <iframe
-                                                className={styles['overlay-iframe']}
-                                                src={selectedStream.embedUrl}
-                                                title={selectedMatch.title}
-                                                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                                                allowFullScreen
-                                                onLoad={handleIframeLoad}
-                                                style={{ opacity: iframeLoading ? 0 : 1 }}
-                                            />
-                                        )}
+                                        <div className={styles['stream-time']}>
+                                            <span className={styles['time-icon']}>🕐</span>
+                                            <span>{formatTime(selectedMatch.date)}</span>
+                                        </div>
                                     </div>
-                                </>
-                            ) : (
-                                <div className={styles['overlay-empty']}>
-                                    <div className={styles['no-stream-icon']}>⏳</div>
-                                    <div>No streams available for this match.</div>
                                 </div>
-                            )}
-                        </div>
+                            </>
+                        ) : (
+                            <div className={styles['no-stream-message']}>
+                                <div className={styles['no-stream-icon']}>⏳</div>
+                                <h3>No streams available</h3>
+                                <p>Please try another source or come back later.</p>
+                            </div>
+                        )}
                     </div>
-                </div>
-            )}
+                )}
+            </ModalX>
         </MainNavBars>
     );
 };
